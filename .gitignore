@@ -1,0 +1,18 @@
+# 依赖与构建产物
+node_modules/
+dist/
+.vite/
+*.local
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+vite-run.log
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 留档：docs/（阶段文档）、shots/（每阶段截图）、concepts/（画风概念图）都要进仓库
