@@ -28,13 +28,39 @@ npm run build    # 离线打包到 dist/
 | [`docs/01-game-spec.md`](docs/01-game-spec.md) | 游戏说明书 v0.1（玩法闭环、五大闭环、四只动物、设计原则、技术架构） |
 | [`docs/02-art-direction.md`](docs/02-art-direction.md) | 画风方向（参考 Piggy Island）、三方案对比、色板、场景扩展建议 |
 | [`docs/03-phased-plan.md`](docs/03-phased-plan.md) | 分阶段开发路线图 P0–P6 与每阶段验收点 |
-| [`docs/04-p1-delivery.md`](docs/04-p1-delivery.md) | **P1 交付说明**：怎么跑、做了什么、截图、文件地图、待你验收的点 |
+| [`docs/04-p1-delivery.md`](docs/04-p1-delivery.md) | P1 交付说明：怎么跑、做了什么、截图、文件地图 |
+| [`docs/05-versioning.md`](docs/05-versioning.md) | 版本管理约定（阶段 = 提交 + tag） |
+| [`docs/06-setting-and-story.md`](docs/06-setting-and-story.md) | 背景故事与地方特色决策文档（三方案对比 + 故事框架） |
+| [`docs/07-setting-bible.md`](docs/07-setting-bible.md) | 设定大纲（地点 / 人物 / 故事框架，内容暂不做） |
+| [`docs/08-p1.5-delivery.md`](docs/08-p1.5-delivery.md) | **P1.5 交付说明**：渔村地方化做了什么、截图、待你验收的点 |
 
 ## 当前阶段
 
-**P1 · 能走路的小岛 —— ✅ 已交付，待你验收。**
-可运行的三维小岛：约 125m 直径的岛、沙滩与环岛浪花、程序化树草石花、4 栋农家小院 + 灯塔 + 栈桥 + 菜地、玩家走路跑步、昼夜光照（夜里路灯亮）、资产总览视角。
-验收点见 `docs/04-p1-delivery.md`；通过后进入 **P2 · 一只动物 + 信任闭环 MVP**。
+**P1.5 · 地方化（中国东南沿海渔村）—— ✅ 已交付，待你验收。**
+在 P1「能走路的小岛」之上把建筑与道具体系换成渔村：石厝 + 燕尾脊、航标塔、土地庙、石阶码头 + 木渔船、晒渔网 / 晒鱼干、梯田菜畦、石板路、榕树 / 芭蕉 / 竹丛、灯笼路灯。
+验收点见 `docs/08-p1.5-delivery.md`；通过后进入 **P2 · 一只动物 + 信任闭环 MVP**。
+
+## 设定（已定）
+
+| 项 | 决定 |
+| --- | --- |
+| 地点 | **中国东南沿海渔村小岛**（闽南 / 浙东 / 粤东一带取材，童话化渲染） |
+| 岛名（暂定） | 半月屿 |
+| 故事框架 | **暑假回乡的外壳 + 守岛人传说的里子**（内容暂不做，只立设定） |
+| 详细设定 | `docs/07-setting-bible.md` |
+
+## 版本管理
+
+一个阶段 = 一个提交 + 一个附注 tag：`p0-design-locked` → `p1-walking-island` → `p1.5-local-flavor` → …
+约定与命令见 [`docs/05-versioning.md`](docs/05-versioning.md)，变更记录见 [`CHANGELOG.md`](CHANGELOG.md)。
+
+## 资产验收工具
+
+| 工具 | 说明 |
+| --- | --- |
+| 游戏内按 `V` | 切换视角（跟随 / 全岛俯瞰 / 地面 / **资产总览**） |
+| `?cam=x,y,z&look=x,y,z` | 自由相机，任意位置给某件资产拍特写 |
+| `node tools/shoot.mjs 名称 "view=top"` | 可靠截图到 `shots/名称.png`，并打印控制台错误 |
 
 ## 已定方向
 

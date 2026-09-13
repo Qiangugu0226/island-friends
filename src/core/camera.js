@@ -20,7 +20,7 @@ export function createCameraRig(camera, cfg, input) {
   const desired = new THREE.Vector3();
 
   const modes = ['follow', 'top', 'ground', 'gallery'];
-  const modeNames = { follow: '跟随', top: '全岛俯瞰', ground: '地面', gallery: '资产总览' };
+  const modeNames = { follow: '跟随', top: '全岛俯瞰', ground: '地面', gallery: '资产总览', free: '自由相机' };
 
   function handleInput(dt) {
     if (input.axis.locked) {

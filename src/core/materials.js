@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // ---------- 材质 ----------
 // 全部使用 flatShading：低多边形硬边切面，参考图的核心质感
@@ -156,3 +157,51 @@ export function shade(object3d, { cast = true, receive = true } = {}) {
   });
   return object3d;
 }
+
+// ---------- 合并部件（把一堆小几何合成一个，便于 InstancedMesh） ----------
+export function mergeParts(parts) {
+  const geos = parts.map((p) => {
+    let g = p.geo.clone();
+    // mergeGeometries 要求索引状态一致：统一转成非索引
+    if (g.index) {
+      const flat = g.toNonIndexed();
+      g.dispose();
+      g = flat;
+    }
+    const m = new THREE.Matrix4().compose(
+      new THREE.Vector3(...(p.pos ?? [0, 0, 0])),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(...(p.rot ?? [0, 0, 0]))),
+      new THREE.Vector3(...(p.scale ?? [1, 1, 1]))
+    );
+    g.applyMatrix4(m);
+    return g;
+  });
+  const merged = mergeGeometries(geos, false);
+  geos.forEach((g) => g.dispose());
+  if (merged) merged.computeVertexNormals();
+  return merged;
+}
+
+// 棕榈/芭蕉叶冠：一圈下垂的长叶片，合成一个几何体。
+// 用 DoubleSide 材质，省掉绕序烦恼。
+export function palmCrownGeometry(leafCount = 7, leafLen = 1.7, leafWidth = 0.62, droop = 0.62, lift = 0.35) {
+  const tris = [];
+  for (let i = 0; i < leafCount; i++) {
+    const a = (i / leafCount) * Math.PI * 2 + (i % 2) * 0.11;
+    const dirX = Math.cos(a);
+    const dirZ = Math.sin(a);
+    const px = -dirZ * leafWidth * 0.5;
+    const pz = dirX * leafWidth * 0.5;
+    const tipX = dirX * leafLen;
+    const tipZ = dirZ * leafLen;
+    const tipY = -droop * leafLen * 0.5;
+    const rootY = lift;
+    const p0 = [px, rootY, pz];
+    const p1 = [-px, rootY, -pz];
+    const p2 = [tipX + px * 0.22, rootY + tipY, tipZ + pz * 0.22];
+    const p3 = [tipX - px * 0.22, rootY + tipY, tipZ - pz * 0.22];
+    tris.push([p0, p1, p2], [p1, p3, p2]);
+  }
+  return geomFromTris(tris);
+}
+

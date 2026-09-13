@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../core/rng.js';
 
-// 建筑与生活小景的摆放：农家小院 / 灯塔 / 栈桥 / 小船 / 菜地 / 各类道具
+// 场景摆放：石厝村落 / 航标塔 / 土地庙 / 石阶码头 + 渔船 / 晒渔网 / 梯田 / 石板路 / 渔家小景
 export function buildStructures(scene, layout, assets, palette) {
   const cfg = layout.cfg;
   const rand = mulberry32(cfg.seed ^ 0x1a2b3c4d);
@@ -9,42 +9,76 @@ export function buildStructures(scene, layout, assets, palette) {
   group.name = 'structures';
   const blockers = [];
   const nightLights = [];
-  const stats = { houses: 0, fences: 0, props: 0 };
+  const stats = { houses: 0, yards: 0, props: 0, slabs: 0 };
 
-  // ---------- 柴堆 ----------
-  function makeWoodpile() {
-    const g = new THREE.Group();
-    const logGeo = new THREE.CylinderGeometry(0.16, 0.16, 1.1, 6);
-    logGeo.rotateZ(Math.PI / 2);
-    const logMat = assets.mat(palette.woodDark);
-    const capMat = assets.mat(palette.trunk);
-    for (let row = 0; row < 3; row++) {
-      const count = 5 - row;
-      for (let i = 0; i < count; i++) {
-        const log = new THREE.Mesh(logGeo, row % 2 === 0 ? logMat : capMat);
-        log.position.set((i - (count - 1) / 2) * 0.34, 0.18 + row * 0.32, (row % 2 ? 0.06 : -0.06));
-        g.add(log);
+  // ---------- 石板路（沿道路铺石板）----------
+  const slabGeo = new THREE.BoxGeometry(1.35, 0.14, 1.05);
+  const slabMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  const slabPositions = [];
+  const slabColor = new THREE.Color();
+  for (const path of layout.paths) {
+    for (const s of path.segs) {
+      const len = Math.hypot(s.dx, s.dz);
+      const n = Math.max(1, Math.round(len / 0.85));
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n;
+        const x = s.a.x + s.dx * t + (rand() - 0.5) * 0.28;
+        const z = s.a.z + s.dz * t + (rand() - 0.5) * 0.28;
+        const y = layout.heightAt(x, z) + 0.05;
+        if (y < -0.2) continue;
+        slabPositions.push({
+          x,
+          y,
+          z,
+          ry: Math.atan2(s.dx, s.dz) + Math.PI / 2 + (rand() - 0.5) * 0.16,
+          s: 0.82 + rand() * 0.34,
+          color: rand() < 0.5 ? palette.stone : palette.stoneDark
+        });
       }
     }
-    g.traverse((o) => {
-      if (o.isMesh) {
-        o.castShadow = true;
-        o.receiveShadow = true;
-      }
-    });
-    return g;
+  }
+  if (slabPositions.length) {
+    const slabMesh = new THREE.InstancedMesh(slabGeo, slabMat, slabPositions.length);
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const v3 = new THREE.Vector3();
+    const s3 = new THREE.Vector3();
+    for (let i = 0; i < slabPositions.length; i++) {
+      const it = slabPositions[i];
+      e.set(0, it.ry, 0);
+      q.setFromEuler(e);
+      v3.set(it.x, it.y, it.z);
+      s3.set(it.s, 1, it.s);
+      m4.compose(v3, q, s3);
+      slabMesh.setMatrixAt(i, m4);
+      slabColor.set(it.color);
+      slabMesh.setColorAt(i, slabColor);
+    }
+    slabMesh.instanceMatrix.needsUpdate = true;
+    if (slabMesh.instanceColor) slabMesh.instanceColor.needsUpdate = true;
+    slabMesh.receiveShadow = true;
+    slabMesh.castShadow = false;
+    group.add(slabMesh);
+    stats.slabs = slabPositions.length;
   }
 
-  // ---------- 农家小院 ----------
-  layout.pads.forEach((pad, index) => {
-    const house = assets.makeFarmhouse(rand, pad);
+  // ---------- 石厝小院 ----------
+  layout.pads.forEach((pad) => {
+    const house = assets.makeStoneHouse(rand, pad);
     house.position.set(pad.x, pad.y, pad.z);
     group.add(house);
-    blockers.push({ x: pad.x, z: pad.z, r: Math.max(pad.w, pad.d) * 0.62, h: pad.y + pad.wallH + pad.roofH + 0.6 });
+    blockers.push({
+      x: pad.x,
+      z: pad.z,
+      r: Math.max(pad.w, pad.d) * 0.62,
+      h: pad.y + pad.wallH + pad.roofH + 0.8
+    });
+    stats.houses++;
 
-    // 院墙栅栏（朝村子中心一侧留门）
-    const fw = pad.w + 5.0;
-    const fd = pad.d + 5.0;
+    // 石砌矮院墙，朝村子中心留门
+    const fw = pad.w + 5.4;
+    const fd = pad.d + 5.4;
     const toCenter = new THREE.Vector2(-pad.x, -pad.z).normalize();
     const localAngle = Math.atan2(toCenter.y, toCenter.x) - (pad.rot ?? 0);
     const sides = [
@@ -56,48 +90,60 @@ export function buildStructures(scene, layout, assets, palette) {
     let best = sides[0];
     let bestDiff = Infinity;
     for (const s of sides) {
-      let diff = Math.abs(((localAngle - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      const diff = Math.abs(((localAngle - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
       if (diff < bestDiff) {
         bestDiff = diff;
         best = s;
       }
     }
-    const fence = assets.makeYardFence(fw, fd, { gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }] });
-    fence.position.set(pad.x, layout.heightAt(pad.x, pad.z), pad.z);
-    fence.rotation.y = pad.rot ?? 0;
-    group.add(fence);
-    stats.fences++;
-
-    // 柴堆 + 木桶
-    const wx = pad.x + Math.cos((pad.rot ?? 0) + 1.9) * (pad.w * 0.75);
-    const wz = pad.z + Math.sin((pad.rot ?? 0) + 1.9) * (pad.w * 0.75);
-    const woodpile = makeWoodpile();
-    woodpile.position.set(wx, layout.heightAt(wx, wz), wz);
-    woodpile.rotation.y = -(pad.rot ?? 0);
-    group.add(woodpile);
+    const yard = assets.makeStoneWallYard(fw, fd, { gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }] });
+    yard.position.set(pad.x, layout.heightAt(pad.x, pad.z), pad.z);
+    yard.rotation.y = pad.rot ?? 0;
+    group.add(yard);
+    stats.yards++;
   });
 
-  // ---------- 灯塔 ----------
-  let lighthouseLight = null;
-  if (cfg.lighthouse) {
-    const lhCfg = cfg.lighthouse;
-    const pad = layout.landmarkPads.find((p) => p.kind === 'lighthouse');
-    const lh = assets.makeLighthouse(lhCfg);
-    const y = pad ? pad.y : layout.heightAt(lhCfg.x, lhCfg.z);
-    lh.group.position.set(lhCfg.x, y, lhCfg.z);
-    lh.group.rotation.y = lhCfg.rot ?? 0;
-    group.add(lh.group);
-    lighthouseLight = lh.light;
-    nightLights.push(lh.light);
-    blockers.push({ x: lhCfg.x, z: lhCfg.z, r: 3.4, h: y + (lhCfg.height ?? 15) + 2 });
+  // ---------- 航标塔（地标）----------
+  if (cfg.beaconTower) {
+    const bt = cfg.beaconTower;
+    const pad = layout.landmarkPads.find((p) => p.kind === 'beacon');
+    const tower = assets.makeBeaconTower(bt);
+    const y = pad ? pad.y : layout.heightAt(bt.x, bt.z);
+    tower.group.position.set(bt.x, y, bt.z);
+    tower.group.rotation.y = bt.rot ?? 0;
+    group.add(tower.group);
+    nightLights.push(tower.light);
+    blockers.push({ x: bt.x, z: bt.z, r: 3.4, h: y + (bt.height ?? 14) + 2 });
 
-    // 灯塔外围一圈矮栏杆
-    const rail = assets.makeYardFence(15, 15, { height: 0.8, gaps: [{ x: 0, z: 7.5, r: 2.4 }] });
-    rail.position.set(lhCfg.x, y, lhCfg.z);
+    const rail = assets.makeStoneWallYard(15, 15, { height: 0.8, gaps: [{ x: 0, z: 7.5, r: 2.4 }] });
+    rail.position.set(bt.x, y, bt.z);
     group.add(rail);
   }
 
-  // ---------- 栈桥 + 小船 ----------
+  // ---------- 土地庙 + 庙前老榕树 ----------
+  if (cfg.shrine) {
+    const sh = cfg.shrine;
+    const pad = layout.landmarkPads.find((p) => p.kind === 'shrine');
+    const y = pad ? pad.y : layout.heightAt(sh.x, sh.z);
+    const shrine = assets.makeShrine();
+    shrine.group.position.set(sh.x, y, sh.z);
+    shrine.group.rotation.y = sh.rot ?? 0;
+    group.add(shrine.group);
+    nightLights.push(shrine.light);
+    blockers.push({ x: sh.x, z: sh.z, r: 2.2, h: y + 3.2 });
+
+    for (const [dx, dz] of [[-4.6, 3.2], [4.2, 4.0]]) {
+      const bx = sh.x + dx;
+      const bz = sh.z + dz;
+      const by = layout.heightAt(bx, bz);
+      const banyan = assets.makeBanyan(rand);
+      banyan.position.set(bx, by, bz);
+      group.add(banyan);
+      blockers.push({ x: bx, z: bz, r: 1.1, h: by + 2.2 });
+    }
+  }
+
+  // ---------- 石阶码头 + 渔船 ----------
   function shoreRadiusAt(angle) {
     const dx = Math.cos(angle);
     const dz = Math.sin(angle);
@@ -116,39 +162,42 @@ export function buildStructures(scene, layout, assets, palette) {
     const r0 = shoreRadiusAt(a);
     const dx = Math.cos(a);
     const dz = Math.sin(a);
-    const px = dx * (r0 - 1.0);
-    const pz = dz * (r0 - 1.0);
-    const py = Math.max(layout.heightAt(px, pz), 0.55);
-    const dock = assets.makeDock(cfg.dock);
-    // 让 -Z 指向离岛方向
-    dock.rotation.y = Math.atan2(-dx, -dz);
-    dock.position.set(px, py, pz);
-    group.add(dock);
+    const px = dx * (r0 - 1.2);
+    const pz = dz * (r0 - 1.2);
+    const py = Math.max(layout.heightAt(px, pz), 0.7);
+    const pier = assets.makeStonePier(cfg.dock);
+    pier.rotation.y = Math.atan2(-dx, -dz);
+    pier.position.set(px, py, pz);
+    group.add(pier);
     stats.props++;
 
-    const bow = new THREE.Vector3(px, py, pz).addScaledVector(new THREE.Vector3(dx, 0, dz), cfg.dock.length - 2.0);
-    bow.y = 0.18;
-    const boat = assets.makeBoat();
+    const bow = new THREE.Vector3(px, py, pz).addScaledVector(new THREE.Vector3(dx, 0, dz), cfg.dock.length - 2.4);
+    bow.y = 0.22;
+    const boat = assets.makeFishingBoat(rand);
     boat.position.copy(bow);
-    boat.rotation.y = Math.atan2(-dx, -dz) + Math.PI / 2 + 0.12;
+    boat.rotation.y = Math.atan2(-dx, -dz) + Math.PI / 2 + 0.1;
     group.add(boat);
   }
 
-  // ---------- 菜地 ----------
+  // ---------- 梯田菜畦 ----------
   if (cfg.cropField) {
-    const field = assets.makeCropField(rand, cfg.cropField);
+    const field = assets.makeTerraceField(rand, cfg.cropField);
     const pad = layout.landmarkPads.find((p) => p.kind === 'crop');
-    field.position.set(cfg.cropField.x, (pad ? pad.y : layout.heightAt(cfg.cropField.x, cfg.cropField.z)) + 0.05, cfg.cropField.z);
+    field.position.set(
+      cfg.cropField.x,
+      (pad ? pad.y : layout.heightAt(cfg.cropField.x, cfg.cropField.z)) + 0.05,
+      cfg.cropField.z
+    );
     group.add(field);
   }
 
-  // ---------- 生活道具 ----------
+  // ---------- 渔家小景 ----------
   const place = (builder, list, opts = {}) => {
     for (const item of list ?? []) {
       const obj = builder();
       const x = item.x;
       const z = item.z;
-      const y = layout.heightAt(x, z) - (opts.sink ?? 0.12);
+      const y = layout.heightAt(x, z) - (opts.sink ?? 0.1);
       if (obj.group) {
         obj.group.position.set(x, y, z);
         obj.group.rotation.y = item.rot ?? 0;
@@ -165,15 +214,19 @@ export function buildStructures(scene, layout, assets, palette) {
   };
 
   const P = cfg.props ?? {};
-  place(assets.makeWell, P.well, { blockerRadius: 1.4 });
+  place(assets.makeWell, P.well, { blockerRadius: 1.5, blockerHeight: 3.4 });
   place(assets.makeMillstone, P.millstone, { blockerRadius: 1.2 });
   place(() => assets.makeHaystack(rand), P.haystacks, { blockerRadius: 1.3 });
-  place(() => assets.makePumpkin(rand), P.pumpkins, { sink: 0.05 });
+  place(() => assets.makePumpkin(rand), P.pumpkins, { sink: 0.04 });
   place(assets.makeBarrel, P.barrels, { blockerRadius: 0.55 });
-  place(assets.makeBench, P.benches, { blockerRadius: 1.0 });
-  place(assets.makeLamp, P.lamps, { blockerRadius: 0.3 });
+  place(assets.makeStoneBench, P.benches, { blockerRadius: 1.0 });
+  place(assets.makeLanternPost, P.lanternPosts, { blockerRadius: 0.3, blockerHeight: 3.4 });
   place(assets.makeClothesline, P.clotheslines, {});
   place(assets.makeMailbox, P.mailboxes, { blockerRadius: 0.35 });
+  place(assets.makeNetRack, P.netRacks, { blockerRadius: 1.6, blockerHeight: 2.6 });
+  place(() => assets.makeDryingRack(rand), P.dryingRacks, { blockerRadius: 1.1 });
+  place(assets.makeWaterJar, P.waterJars, { blockerRadius: 0.55 });
+  place(() => assets.makeBasket(rand), P.baskets, { blockerRadius: 0.4 });
 
   // 池塘四周点缀石头
   for (const pond of layout.ponds) {

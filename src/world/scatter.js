@@ -88,7 +88,7 @@ export function scatterWorld(scene, layout, assets, palette) {
     return mesh;
   }
 
-  const stats = { trees: 0, bushes: 0, rocks: 0, flowers: 0, stumps: 0, tufts: 0 };
+  const stats = { trees: 0, bushes: 0, rocks: 0, flowers: 0, stumps: 0, tufts: 0, banyans: 0, bananas: 0, bamboos: 0 };
 
   // ---------- 树 ----------
   const treeGrid = makeGrid(scatter.treeMinDistance);
@@ -137,6 +137,100 @@ export function scatterWorld(scene, layout, assets, palette) {
     const mesh = buildInstanced(geo, leafMat, items, { colored: true });
     if (mesh) group.add(mesh);
   }
+
+  // ---------- 榕树（大冠幅 + 气根，渔村标志树）----------
+  const banyanGrid = makeGrid(scatter.banyanMinDistance ?? 13);
+  const banyanTrunks = [];
+  const banyanCanopies = [];
+  for (let i = 0; i < (scatter.banyans ?? 0); i++) {
+    const p = samplePoint({
+      minDist: scatter.banyanMinDistance ?? 13,
+      minHeight: island.grassStart + 0.6,
+      maxSlope: 0.4,
+      grid: banyanGrid,
+      extra: 4.5,
+      tries: 40
+    });
+    if (!p) continue;
+    banyanGrid.add(p.x, p.z);
+    const scale = 0.85 + rand() * 0.45;
+    banyanTrunks.push({ x: p.x, y: p.h, z: p.z, ry: rand() * Math.PI, sx: scale, sy: scale, sz: scale });
+    const blobs = 5 + Math.floor(rand() * 3);
+    for (let b = 0; b < blobs; b++) {
+      const a = (b / blobs) * Math.PI * 2;
+      const r = b === 0 ? 0 : (1.1 + rand() * 0.7) * scale;
+      const s = (1.5 + rand() * 0.7) * scale;
+      banyanCanopies.push({
+        x: p.x + Math.cos(a) * r,
+        y: p.h + (3.1 + (b === 0 ? 0.35 : 0)) * scale,
+        z: p.z + Math.sin(a) * r,
+        ry: rand() * Math.PI,
+        sx: s,
+        sy: s * (0.75 + rand() * 0.2),
+        sz: s,
+        color: rand() < 0.35 ? palette.banyanLeafDark : palette.banyanLeaf
+      });
+    }
+    stats.banyans++;
+  }
+  const banyanTrunkMesh = buildInstanced(assets.geos.banyanTrunkGeo, trunkMat, banyanTrunks);
+  if (banyanTrunkMesh) group.add(banyanTrunkMesh);
+  const banyanLeafMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  const banyanLeafMesh = buildInstanced(assets.geos.banyanCanopyGeo, banyanLeafMat, banyanCanopies, { colored: true });
+  if (banyanLeafMesh) group.add(banyanLeafMesh);
+
+  // ---------- 芭蕉 ----------
+  const bananaGrid = makeGrid(4);
+  const bananaStems = [];
+  const bananaCrowns = [];
+  for (let i = 0; i < (scatter.bananas ?? 0); i++) {
+    const p = samplePoint({ minDist: 4, minHeight: island.grassStart + 0.2, maxSlope: 0.45, grid: bananaGrid, extra: 1.4, tries: 20 });
+    if (!p) continue;
+    bananaGrid.add(p.x, p.z);
+    const scale = 0.8 + rand() * 0.5;
+    const ry = rand() * Math.PI;
+    bananaStems.push({ x: p.x, y: p.h, z: p.z, ry, sx: 1, sy: scale, sz: 1 });
+    bananaCrowns.push({
+      x: p.x,
+      y: p.h + 2.0 * scale,
+      z: p.z,
+      ry: ry + rand(),
+      sx: scale,
+      sy: scale,
+      sz: scale,
+      color: rand() < 0.3 ? palette.bananaLeaf : palette.leafColors[3]
+    });
+    stats.bananas++;
+  }
+  const bananaStemMesh = buildInstanced(assets.geos.bananaStemGeo, assets.mat(palette.bananaStem), bananaStems);
+  if (bananaStemMesh) group.add(bananaStemMesh);
+  const bananaLeafMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, side: THREE.DoubleSide });
+  const bananaCrownMesh = buildInstanced(assets.geos.bananaCrownGeo, bananaLeafMat, bananaCrowns, { colored: true });
+  if (bananaCrownMesh) group.add(bananaCrownMesh);
+
+  // ---------- 竹丛 ----------
+  const bambooGrid = makeGrid(5);
+  const bambooItems = [];
+  for (let i = 0; i < (scatter.bamboos ?? 0); i++) {
+    const p = samplePoint({ minDist: 4.6, minHeight: island.grassStart + 0.1, maxSlope: 0.5, grid: bambooGrid, extra: 1.6, tries: 18 });
+    if (!p) continue;
+    bambooGrid.add(p.x, p.z);
+    const s = 0.75 + rand() * 0.5;
+    bambooItems.push({
+      x: p.x,
+      y: p.h,
+      z: p.z,
+      ry: rand() * Math.PI,
+      sx: s,
+      sy: s,
+      sz: s,
+      color: rand() < 0.4 ? palette.bambooDark : palette.bamboo
+    });
+    stats.bamboos++;
+  }
+  const bambooMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  const bambooMesh = buildInstanced(assets.geos.bambooClumpGeo, bambooMat, bambooItems, { colored: true });
+  if (bambooMesh) group.add(bambooMesh);
 
   // ---------- 灌木 ----------
   const bushGrid = makeGrid(2.0);

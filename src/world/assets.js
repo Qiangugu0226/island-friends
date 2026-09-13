@@ -1,11 +1,13 @@
 import * as THREE from 'three';
-import { makeMatCache, gableRoofGeometry, shade } from '../core/materials.js';
+import { makeMatCache, gableRoofGeometry, shade, mergeParts, palmCrownGeometry } from '../core/materials.js';
 
-// 全部资产都是代码生成的几何体：低多边形 + flatShading + 参考图色板
+// 全部资产都是代码生成的几何体：低多边形 + flatShading
+// 造型体系 = 中国东南沿海渔村（石厝 / 燕尾脊 / 航标塔 / 土地庙 / 石阶码头 / 渔网 / 榕树芭蕉竹丛）
+// 配色体系 = 参考图 Explore! Piggy Island 的暖奶油 + 青绿 + 黄绿（童话化处理）
 export function createAssets(palette) {
   const mat = makeMatCache();
 
-  // ---------- 几何缓存（散布用 InstancedMesh，几何复用） ----------
+  // ---------- 几何缓存 ----------
   const trunkGeo = new THREE.CylinderGeometry(0.15, 0.24, 2.4, 6);
   trunkGeo.translate(0, 1.2, 0);
 
@@ -16,7 +18,6 @@ export function createAssets(palette) {
 
   const bushGeo = new THREE.IcosahedronGeometry(0.75, 0);
   const bushSmallGeo = new THREE.IcosahedronGeometry(0.5, 0);
-
   const rockGeo = new THREE.DodecahedronGeometry(0.6, 0);
   const stoneGeoS = new THREE.DodecahedronGeometry(0.32, 0);
 
@@ -34,7 +35,717 @@ export function createAssets(palette) {
   const tuftGeo = new THREE.ConeGeometry(0.16, 0.75, 4);
   tuftGeo.translate(0, 0.34, 0);
 
-  // ---------- 树 ----------
+  // 榕树：粗干 + 宽冠 + 气根
+  const banyanTrunkGeo = new THREE.CylinderGeometry(0.42, 0.66, 3.0, 7);
+  banyanTrunkGeo.translate(0, 1.5, 0);
+  const banyanCanopyGeo = new THREE.IcosahedronGeometry(1, 0);
+  banyanCanopyGeo.scale(1.35, 0.72, 1.35);
+  const banyanRootGeo = new THREE.CylinderGeometry(0.055, 0.075, 2.6, 4);
+  banyanRootGeo.translate(0, -1.3, 0);
+
+  // 芭蕉：茎 + 叶冠
+  const bananaStemGeo = new THREE.CylinderGeometry(0.16, 0.24, 2.0, 6);
+  bananaStemGeo.translate(0, 1.0, 0);
+  const bananaCrownGeo = palmCrownGeometry(7, 1.9, 0.7, 0.75, 0.5);
+
+  // 竹丛：几根细竹 + 叶球，合并成一个几何
+  const bambooClumpGeo = (() => {
+    const parts = [];
+    const stick = new THREE.CylinderGeometry(0.055, 0.07, 4.2, 5);
+    stick.translate(0, 2.1, 0);
+    const leaf = new THREE.IcosahedronGeometry(0.34, 0);
+    leaf.scale(1.1, 0.5, 1.1);
+    const offsets = [
+      [0, 0], [0.32, 0.18], [-0.3, 0.22], [0.16, -0.32], [-0.2, -0.26], [0.42, -0.1]
+    ];
+    offsets.forEach(([x, z], i) => {
+      const h = 0.82 + (i % 3) * 0.09;
+      parts.push({ geo: stick, pos: [x, 0, z], rot: [0, 0, (i % 2 ? 1 : -1) * 0.045], scale: [1, h, 1] });
+      parts.push({ geo: leaf, pos: [x + (i % 2 ? 0.1 : -0.1), 3.1 + h * 1.0, z], rot: [0, i * 0.7, 0] });
+    });
+    return mergeParts(parts);
+  })();
+
+  // 渔网格子（晒网架用）
+  const netLatticeGeo = (() => {
+    const parts = [];
+    const barV = new THREE.BoxGeometry(0.05, 2.0, 0.05);
+    const barH = new THREE.BoxGeometry(3.4, 0.05, 0.05);
+    for (let i = 0; i < 6; i++) parts.push({ geo: barV, pos: [-1.6 + i * 0.64, 0, 0] });
+    for (let i = 0; i < 4; i++) parts.push({ geo: barH, pos: [0, -0.75 + i * 0.5, 0] });
+    return mergeParts(parts);
+  })();
+
+  const doubleSideMat = (color) => new THREE.MeshLambertMaterial({
+    color: new THREE.Color(color),
+    flatShading: true,
+    side: THREE.DoubleSide
+  });
+
+  // ---------- 燕尾脊屋顶 ----------
+  function swallowtailRoof(w, h, d, tileColor, ridgeColor, overhang = 0.5) {
+    const g = new THREE.Group();
+    const hw = w / 2 + overhang;
+    g.add(new THREE.Mesh(gableRoofGeometry(w, h, d, overhang), mat(tileColor)));
+
+    // 正脊（细一点，别像一条横梁）
+    const ridgeT = 0.17;
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 0.18, ridgeT, 0.24), mat(ridgeColor));
+    ridge.position.y = h + 0.07;
+    g.add(ridge);
+
+    // 两端燕尾翘角：从正脊端点接出去，两段叠出上扬的曲线
+    const tipLen1 = Math.min(0.95, w * 0.13) + 0.34;
+    const tipLen2 = Math.min(0.5, w * 0.07) + 0.2;
+    for (const s of [-1, 1]) {
+      const tip1 = new THREE.Mesh(new THREE.BoxGeometry(tipLen1, 0.22, 0.26), mat(ridgeColor));
+      tip1.position.set(s * (hw + tipLen1 * 0.4), h + 0.14, 0);
+      tip1.rotation.z = s * 0.52;
+      g.add(tip1);
+      const tip2 = new THREE.Mesh(new THREE.BoxGeometry(tipLen2, 0.18, 0.22), mat(ridgeColor));
+      tip2.position.set(s * (hw + tipLen1 * 0.78 + tipLen2 * 0.4), h + 0.42, 0);
+      tip2.rotation.z = s * 1.05;
+      g.add(tip2);
+    }
+
+    // 脊饰
+    const orn = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.26), mat(ridgeColor));
+    orn.position.y = h + 0.2;
+    g.add(orn);
+    return g;
+  }
+
+  // ---------- 民居（石厝 / 白墙 / 红砖）----------
+  function makeStoneHouse(rand, cfg) {
+    const g = new THREE.Group();
+    const w = cfg.w;
+    const d = cfg.d;
+    const wallH = cfg.wallH;
+    const roofH = cfg.roofH;
+    const style = cfg.style ?? 'stone';
+    const wallColor = style === 'white' ? palette.wallWhite : style === 'brick' ? palette.wallBrick : palette.wallStone;
+    const wallAlt = style === 'white' ? palette.wallWhite : style === 'brick' ? palette.wallBrickDark : palette.wallStoneAlt;
+
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.55, d + 0.6), mat(palette.stoneDark));
+    plinth.position.y = 0.28;
+    g.add(plinth);
+
+    const bands = 3;
+    const bandH = wallH / bands;
+    for (let i = 0; i < bands; i++) {
+      const band = new THREE.Mesh(
+        new THREE.BoxGeometry(w + (i === 0 ? 0.16 : 0), bandH, d + (i === 0 ? 0.16 : 0)),
+        mat(i % 2 === 0 ? wallColor : wallAlt)
+      );
+      band.position.y = 0.55 + bandH * (i + 0.5);
+      g.add(band);
+    }
+
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(w + 0.9, 0.22, d + 0.9), mat(palette.timberDark));
+    beam.position.y = 0.55 + wallH + 0.11;
+    g.add(beam);
+
+    const tile = cfg.roofTile ?? palette.roofTile;
+    const ridgeColor = cfg.ridge ?? palette.lanternRed;
+    const roof = swallowtailRoof(w, roofH, d, tile, ridgeColor, 0.62);
+    roof.position.y = 0.55 + wallH + 0.2;
+    g.add(roof);
+
+    if (cfg.stove !== false) {
+      const stove = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.0, 0.5), mat(palette.stoneDark));
+      stove.position.set(-w * 0.3, 0.55 + wallH + roofH * 0.55, d * 0.12);
+      g.add(stove);
+      const stoveCap = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.14, 0.7), mat(palette.roofTileDark));
+      stoveCap.position.set(-w * 0.3, 0.55 + wallH + roofH * 0.55 + 0.55, d * 0.12);
+      g.add(stoveCap);
+    }
+
+    const doorW = 1.2;
+    const doorH = 2.0;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.18), mat(palette.timberDark));
+    door.position.set(0, 0.55 + doorH / 2, d / 2 + 0.04);
+    g.add(door);
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.5, 0.2, 0.26), mat(palette.timber));
+    lintel.position.set(0, 0.55 + doorH + 0.12, d / 2 + 0.06);
+    g.add(lintel);
+    for (const s of [-1, 1]) {
+      const couplet = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.5, 0.06), mat(palette.lanternRed));
+      couplet.position.set(s * (doorW / 2 + 0.28), 0.55 + 1.15, d / 2 + 0.12);
+      g.add(couplet);
+    }
+    const step = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.9, 0.22, 0.7), mat(palette.stone));
+    step.position.set(0, 0.16, d / 2 + 0.42);
+    g.add(step);
+
+    const addWindow = (x, y, z, ry) => {
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.25, 0.16), mat(palette.timber));
+      frame.position.set(x, y, z);
+      frame.rotation.y = ry;
+      g.add(frame);
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.95, 0.1), mat('#3A3B33'));
+      pane.position.set(x, y, z);
+      pane.rotation.y = ry;
+      g.add(pane);
+      const barV = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.0, 0.16), mat(palette.timber));
+      barV.position.set(x, y, z);
+      barV.rotation.y = ry;
+      g.add(barV);
+      const barH = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.09, 0.16), mat(palette.timber));
+      barH.position.set(x, y, z);
+      barH.rotation.y = ry;
+      g.add(barH);
+    };
+    addWindow(w / 2 + 0.06, 0.55 + wallH * 0.6, d * 0.16, Math.PI / 2);
+    addWindow(-w / 2 - 0.06, 0.55 + wallH * 0.6, d * 0.16, Math.PI / 2);
+    addWindow(w * 0.3, 0.55 + wallH * 0.6, d / 2 + 0.06, 0);
+
+    g.rotation.y = cfg.rot ?? 0;
+    void rand;
+    return shade(g);
+  }
+
+  // ---------- 石砌矮院墙（留门洞）----------
+  function makeStoneWallYard(w, d, opts = {}) {
+    const g = new THREE.Group();
+    const h = opts.height ?? 0.95;
+    const t = 0.42;
+    const gaps = opts.gaps ?? [];
+    const inGap = (x, z) => gaps.some((gp) => Math.hypot(x - gp.x, z - gp.z) < (gp.r ?? 2.2));
+
+    const segGeoX = new THREE.BoxGeometry(1, h, t);
+    const segGeoZ = new THREE.BoxGeometry(t, h, 1);
+    const capGeoX = new THREE.BoxGeometry(1, 0.12, t + 0.14);
+    const capGeoZ = new THREE.BoxGeometry(t + 0.14, 0.12, 1);
+    const wallMat = mat(opts.color ?? palette.wallStone);
+    const capMat = mat(opts.capColor ?? palette.stoneDark);
+
+    const build = (x, z, segLen, alongX) => {
+      if (segLen <= 0.05) return;
+      const seg = new THREE.Mesh(alongX ? segGeoX : segGeoZ, wallMat);
+      seg.scale.set(alongX ? segLen : 1, 1, alongX ? 1 : segLen);
+      seg.position.set(x, h / 2, z);
+      g.add(seg);
+      const cap = new THREE.Mesh(alongX ? capGeoX : capGeoZ, capMat);
+      cap.scale.set(alongX ? segLen : 1, 1, alongX ? 1 : segLen);
+      cap.position.set(x, h + 0.06, z);
+      g.add(cap);
+    };
+
+    const step = 1.4;
+    const nx = Math.max(2, Math.round(w / step));
+    const nz = Math.max(2, Math.round(d / step));
+    for (const z of [-d / 2, d / 2]) {
+      const seg = w / nx;
+      for (let i = 0; i < nx; i++) {
+        const cx = -w / 2 + seg * (i + 0.5);
+        if (inGap(cx, z)) continue;
+        build(cx, z, seg * 0.98, true);
+      }
+    }
+    for (const x of [-w / 2, w / 2]) {
+      const seg = d / nz;
+      for (let j = 0; j < nz; j++) {
+        const cz = -d / 2 + seg * (j + 0.5);
+        if (inGap(x, cz)) continue;
+        build(x, cz, seg * 0.98, false);
+      }
+    }
+    return shade(g);
+  }
+
+  // ---------- 航标塔（地标）----------
+  function makeBeaconTower(cfg) {
+    const g = new THREE.Group();
+    const H = cfg.height ?? 13;
+    const bodyH = H - 3.4;
+    const whiteMat = mat(palette.lighthouseWhite);
+    const redMat = mat(palette.lanternRed);
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.9, 1.8, 10), mat(palette.stone));
+    base.position.y = 0.9;
+    g.add(base);
+    const baseCap = new THREE.Mesh(new THREE.CylinderGeometry(2.35, 2.35, 0.25, 10), mat(palette.stoneDark));
+    baseCap.position.y = 1.9;
+    g.add(baseCap);
+
+    const segments = 4;
+    const segH = bodyH / segments;
+    for (let i = 0; i < segments; i++) {
+      const rBottom = 1.75 - (i / segments) * 0.5;
+      const rTop = 1.75 - ((i + 1) / segments) * 0.5;
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBottom, segH, 10, 1), whiteMat);
+      seg.position.y = 2.0 + segH * (i + 0.5);
+      g.add(seg);
+    }
+
+    const galleryY = 2.0 + bodyH;
+    const gallery = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.7, 0.4, 10), mat(palette.stoneDark));
+    gallery.position.y = galleryY + 0.2;
+    g.add(gallery);
+
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.7, 0.1), whiteMat);
+      post.position.set(Math.cos(a) * 1.72, galleryY + 0.75, Math.sin(a) * 1.72);
+      g.add(post);
+    }
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.72, 0.07, 5, 14), whiteMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = galleryY + 1.05;
+    g.add(ring);
+
+    const lantern = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.1, 1.25, 1.9, 8),
+      mat('#FFE9A8', { emissive: new THREE.Color('#FFD98A'), emissiveIntensity: 0.35 })
+    );
+    lantern.position.y = galleryY + 1.45;
+    g.add(lantern);
+    const top = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.4, 8), redMat);
+    top.position.y = galleryY + 3.1;
+    g.add(top);
+    const finial = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), mat(palette.gold));
+    finial.position.y = galleryY + 3.95;
+    g.add(finial);
+
+    const belt = new THREE.Mesh(new THREE.CylinderGeometry(1.62, 1.68, 0.5, 10), redMat);
+    belt.position.y = 2.0 + bodyH * 0.52;
+    g.add(belt);
+
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.7, 0.3), mat(palette.timberDark));
+    door.position.set(0, 1.15, 2.2);
+    g.add(door);
+
+    const light = new THREE.PointLight(new THREE.Color('#FFD98A'), 0, 46, 1.6);
+    light.position.y = galleryY + 1.45;
+    g.add(light);
+
+    return { group: shade(g), light };
+  }
+
+  // ---------- 土地庙 ----------
+  function makeShrine() {
+    const g = new THREE.Group();
+    const w = 2.2;
+    const d = 1.9;
+    const h = 1.7;
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w + 1.1, 0.35, d + 1.1), mat(palette.stoneDark));
+    base.position.y = 0.17;
+    g.add(base);
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(palette.wallWhite));
+    body.position.y = 0.35 + h / 2;
+    g.add(body);
+
+    const roof = swallowtailRoof(w, 0.85, d, palette.roofRed, palette.lanternRed, 0.4);
+    roof.position.y = 0.35 + h;
+    g.add(roof);
+
+    const opening = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.1, 0.12), mat('#2E2A24'));
+    opening.position.set(0, 0.35 + 0.7, d / 2 + 0.03);
+    g.add(opening);
+
+    const table = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.72, 0.72), mat(palette.timberDark));
+    table.position.set(0, 0.36, d / 2 + 1.0);
+    g.add(table);
+    const censer = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.28, 8), mat(palette.gold));
+    censer.position.set(0, 0.72 + 0.18, d / 2 + 1.0);
+    g.add(censer);
+    for (let i = 0; i < 3; i++) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.55, 4), mat('#8A3B2A'));
+      stick.position.set(-0.09 + i * 0.09, 0.72 + 0.55, d / 2 + 1.0);
+      stick.rotation.z = (i - 1) * 0.14;
+      g.add(stick);
+    }
+
+    for (const s of [-1, 1]) {
+      const l = new THREE.Mesh(
+        new THREE.SphereGeometry(0.24, 8, 7),
+        mat(palette.lanternRed, { emissive: new THREE.Color('#B8322A'), emissiveIntensity: 0.32 })
+      );
+      l.scale.set(1, 0.82, 1);
+      l.position.set(s * 1.5, 0.35 + h + 0.55, d / 2 + 0.3);
+      g.add(l);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.07, 6), mat(palette.gold));
+      cap.position.set(s * 1.5, 0.35 + h + 0.79, d / 2 + 0.3);
+      g.add(cap);
+      const tassel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.22, 4), mat(palette.gold));
+      tassel.position.set(s * 1.5, 0.35 + h + 0.28, d / 2 + 0.3);
+      g.add(tassel);
+    }
+
+    const light = new THREE.PointLight(new THREE.Color('#FFB46B'), 0, 13, 1.8);
+    light.position.set(0, 1.6, d / 2 + 0.9);
+    g.add(light);
+
+    return { group: shade(g), light };
+  }
+
+  // ---------- 石阶码头 ----------
+  function makeStonePier(cfg) {
+    const g = new THREE.Group();
+    const L = cfg.length ?? 14;
+    const W = cfg.width ?? 3.0;
+    const steps = 6;
+
+    for (let i = 0; i < steps; i++) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(W, 0.3, 0.8), mat(i % 2 === 0 ? palette.stone : palette.stoneDark));
+      step.position.set(0, 1.1 - i * 0.3, -i * 0.8);
+      g.add(step);
+    }
+
+    const pierLen = L - steps * 0.8;
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, pierLen), mat(palette.stone));
+    deck.position.set(0, 1.0, -steps * 0.8 - pierLen / 2);
+    g.add(deck);
+    const deckTop = new THREE.Mesh(new THREE.BoxGeometry(W + 0.2, 0.1, pierLen), mat(palette.stoneDark));
+    deckTop.position.set(0, 1.22, deck.position.z);
+    g.add(deckTop);
+
+    for (let i = 0; i < Math.round(pierLen / 2.4); i++) {
+      const z = -steps * 0.8 - 1.2 - i * 2.4;
+      for (const x of [-W / 2 + 0.35, W / 2 - 0.35]) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.2, 0.5), mat(palette.stoneDark));
+        post.position.set(x, 0.0, z);
+        g.add(post);
+      }
+    }
+
+    for (const x of [W / 2 - 0.3, -W / 2 + 0.3]) {
+      const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.75, 6), mat(palette.stoneDark));
+      bollard.position.set(x, 1.55, -steps * 0.8 - 1.6);
+      g.add(bollard);
+    }
+    return shade(g);
+  }
+
+  // ---------- 木渔船（竹篷 + 渔网 + 鱼篓）----------
+  function makeFishingBoat(rand) {
+    const g = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 1.15, 4.2, 8, 1, false, 0, Math.PI), mat(palette.timber));
+    hull.rotation.z = Math.PI / 2;
+    hull.rotation.y = Math.PI / 2;
+    hull.position.y = 0.5;
+    hull.scale.set(1, 1, 0.5);
+    g.add(hull);
+
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.18, 1.3), mat(palette.timberDark));
+    rim.position.y = 0.72;
+    g.add(rim);
+
+    const canopy = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.62, 0.62, 1.9, 8, 1, true, 0, Math.PI),
+      mat(palette.bambooDark)
+    );
+    canopy.rotation.z = Math.PI / 2;
+    canopy.position.set(-0.35, 1.0, 0);
+    g.add(canopy);
+
+    const oar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 2.6), mat(palette.timberDark));
+    oar.position.set(1.2, 0.9, 0.4);
+    oar.rotation.set(0.12, 0.5, 0);
+    g.add(oar);
+
+    const net = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 0), mat(palette.netColor));
+    net.scale.set(1.2, 0.5, 0.9);
+    net.position.set(1.3, 0.85, -0.35);
+    g.add(net);
+
+    const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 0.5, 8), mat(palette.bamboo));
+    basket.position.set(0.4, 0.95, 0.35);
+    g.add(basket);
+
+    void rand;
+    return shade(g);
+  }
+
+  // ---------- 晒渔网架 ----------
+  function makeNetRack() {
+    const g = new THREE.Group();
+    for (const s of [-1, 1]) {
+      for (const t of [-1, 1]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.6, 0.14), mat(palette.timberDark));
+        leg.position.set(s * 1.7, 1.3, t * 0.42);
+        leg.rotation.x = t * 0.16;
+        g.add(leg);
+      }
+    }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.13, 0.13), mat(palette.timber));
+    bar.position.y = 2.5;
+    g.add(bar);
+    const net = new THREE.Mesh(netLatticeGeo, doubleSideMat(palette.netColor));
+    net.position.set(0, 1.35, 0);
+    g.add(net);
+    return shade(g);
+  }
+
+  // ---------- 晒鱼干架 ----------
+  function makeDryingRack(rand) {
+    const g = new THREE.Group();
+    for (const s of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.9, 0.12), mat(palette.timberDark));
+      post.position.set(s * 1.05, 0.95, 0);
+      g.add(post);
+    }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.1, 0.1), mat(palette.timber));
+    bar.position.y = 1.8;
+    g.add(bar);
+    const fishMat = mat(palette.fishColor);
+    for (let i = 0; i < 4; i++) {
+      const x = -0.85 + i * 0.56;
+      const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 0), fishMat);
+      body.scale.set(0.55, 1.5, 0.4);
+      body.position.set(x, 1.5, 0);
+      g.add(body);
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.26, 4), fishMat);
+      tail.position.set(x, 1.22, 0);
+      tail.rotation.x = Math.PI;
+      g.add(tail);
+    }
+    void rand;
+    return shade(g);
+  }
+
+  // ---------- 水缸 / 竹篓 / 石凳 ----------
+  function makeWaterJar() {
+    const g = new THREE.Group();
+    const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.36, 0.85, 10), mat(palette.clay));
+    jar.position.y = 0.43;
+    g.add(jar);
+    const lip = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 10), mat(palette.clayDark));
+    lip.position.y = 0.85;
+    g.add(lip);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.4, 10), mat(palette.waterPond));
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.83;
+    g.add(water);
+    return shade(g);
+  }
+
+  function makeBasket(rand) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.24, 0.62, 8), mat(palette.bamboo));
+    body.position.y = 0.31;
+    g.add(body);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.035, 4, 10), mat(palette.bambooDark));
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.62;
+    g.add(rim);
+    if (rand() < 0.5) {
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.03, 4, 8, Math.PI), mat(palette.bambooDark));
+      handle.position.y = 0.62;
+      g.add(handle);
+    }
+    return shade(g);
+  }
+
+  function makeStoneBench() {
+    const g = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.22, 0.58), mat(palette.stone));
+    seat.position.y = 0.52;
+    g.add(seat);
+    for (const s of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 0.5), mat(palette.stoneDark));
+      leg.position.set(s * 0.7, 0.25, 0);
+      g.add(leg);
+    }
+    return shade(g);
+  }
+
+  // ---------- 灯笼路灯 ----------
+  function makeLanternPost() {
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 3.2, 6), mat(palette.timberDark));
+    pole.position.y = 1.6;
+    g.add(pole);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.1), mat(palette.timberDark));
+    arm.position.set(0.36, 3.15, 0);
+    g.add(arm);
+    const lantern = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 9, 8),
+      mat(palette.lanternRed, { emissive: new THREE.Color('#C03A2E'), emissiveIntensity: 0.4 })
+    );
+    lantern.scale.set(1, 0.85, 1);
+    lantern.position.set(0.72, 2.85, 0);
+    g.add(lantern);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 6), mat(palette.gold));
+    cap.position.set(0.72, 3.12, 0);
+    g.add(cap);
+    const tassel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.025, 0.26, 4), mat(palette.gold));
+    tassel.position.set(0.72, 2.48, 0);
+    g.add(tassel);
+
+    const light = new THREE.PointLight(new THREE.Color('#FFC177'), 0, 16, 1.8);
+    light.position.set(0.72, 2.8, 0);
+    g.add(light);
+    return { group: shade(g), light };
+  }
+
+  // ---------- 中式水井 ----------
+  function makeWell() {
+    const g = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.15, 1.0, 12), mat(palette.stone));
+    ring.position.y = 0.5;
+    g.add(ring);
+    const ringTop = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.1, 5, 14), mat(palette.stoneDark));
+    ringTop.rotation.x = Math.PI / 2;
+    ringTop.position.y = 1.0;
+    g.add(ringTop);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.9, 12), mat(palette.waterPond));
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.9;
+    g.add(water);
+    for (const s of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.0, 0.16), mat(palette.timberDark));
+      post.position.set(s * 1.0, 1.4, 0);
+      g.add(post);
+    }
+    const winch = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.9, 8), mat(palette.timber));
+    winch.rotation.z = Math.PI / 2;
+    winch.position.y = 2.25;
+    g.add(winch);
+    const crank = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.5, 0.09), mat(palette.timberDark));
+    crank.position.set(1.15, 2.0, 0);
+    g.add(crank);
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.22, 0.4, 8), mat(palette.timber));
+    bucket.position.set(0, 1.45, 0);
+    g.add(bucket);
+    const roof = new THREE.Mesh(gableRoofGeometry(2.6, 0.7, 1.9, 0.3), mat(palette.roofTile));
+    roof.position.y = 2.5;
+    g.add(roof);
+    return shade(g);
+  }
+
+  // ---------- 石磨 / 木桶 / 南瓜 / 稻草堆 / 晾衣绳 / 信箱 ----------
+  function makeMillstone() {
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.5, 10), mat(palette.stone));
+    base.position.y = 0.25;
+    g.add(base);
+    const stone = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.28, 10), mat(palette.stoneDark));
+    stone.position.y = 0.62;
+    stone.rotation.z = 0.1;
+    g.add(stone);
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.4, 6), mat(palette.timberDark));
+    hole.position.set(0.55, 0.72, 0);
+    g.add(hole);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.11, 0.11), mat(palette.timber));
+    handle.position.set(1.3, 0.72, 0);
+    g.add(handle);
+    return shade(g);
+  }
+
+  function makeBarrel() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.95, 9), mat(palette.wood));
+    body.position.y = 0.48;
+    g.add(body);
+    for (const y of [0.15, 0.8]) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.09, 9), mat(palette.woodDark));
+      band.position.y = y;
+      g.add(band);
+    }
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.07, 9), mat(palette.trunkDark));
+    top.position.y = 0.97;
+    g.add(top);
+    return shade(g);
+  }
+
+  function makePumpkin(rand) {
+    const g = new THREE.Group();
+    const s = 0.35 + rand() * 0.18;
+    const body = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), mat('#E8813A'));
+    body.scale.set(1, 0.78, 1);
+    body.position.y = s * 0.78;
+    g.add(body);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.22, 5), mat(palette.grassDark));
+    stem.position.y = s * 1.55;
+    g.add(stem);
+    return shade(g);
+  }
+
+  function makeHaystack(rand) {
+    const g = new THREE.Group();
+    const r = 0.95 + rand() * 0.45;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r, 1.7, 8), mat('#E0BC63'));
+    body.position.y = 0.85;
+    g.add(body);
+    const top = new THREE.Mesh(new THREE.ConeGeometry(r * 0.64, 0.7, 8), mat('#CFA94F'));
+    top.position.y = 2.0;
+    g.add(top);
+    return shade(g);
+  }
+
+  function makeClothesline() {
+    const g = new THREE.Group();
+    for (const s of [-1, 1]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.3, 5), mat(palette.timberDark));
+      pole.position.set(s * 2.2, 1.15, 0);
+      g.add(pole);
+    }
+    const line = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.04, 0.04), mat(palette.timber));
+    line.position.y = 2.1;
+    g.add(line);
+    const clothColors = [palette.indigo, palette.wallWhite, palette.indigoLight, palette.wallWhite];
+    for (let i = 0; i < 4; i++) {
+      const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.8, 0.05), mat(clothColors[i % clothColors.length]));
+      cloth.position.set(-1.6 + i * 1.05, 1.68, 0);
+      cloth.rotation.z = (i % 2 ? 1 : -1) * 0.035;
+      g.add(cloth);
+    }
+    return shade(g);
+  }
+
+  function makeMailbox() {
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.13, 1.2, 0.13), mat(palette.timberDark));
+    pole.position.y = 0.6;
+    g.add(pole);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.44, 0.78), mat(palette.lanternRed));
+    box.position.y = 1.38;
+    g.add(box);
+    const roof = new THREE.Mesh(gableRoofGeometry(0.62, 0.2, 0.86, 0.06), mat(palette.roofTileDark));
+    roof.position.y = 1.62;
+    g.add(roof);
+    return shade(g);
+  }
+
+  // ---------- 梯田菜畦 ----------
+  function makeTerraceField(rand, cfg) {
+    const g = new THREE.Group();
+    const levels = 3;
+    const levelD = cfg.d / levels;
+    for (let i = 0; i < levels; i++) {
+      const z = -cfg.d / 2 + levelD * (i + 0.5);
+      const y = 0.18 + i * 0.22;
+      const soil = new THREE.Mesh(new THREE.BoxGeometry(cfg.w, 0.24, levelD - 0.18), mat(palette.soil));
+      soil.position.set(0, y, z);
+      g.add(soil);
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(cfg.w + 0.2, 0.5, 0.24), mat(palette.stoneDark));
+      wall.position.set(0, 0.25 + i * 0.22, z + levelD / 2);
+      g.add(wall);
+      const rows = 3;
+      const rowStep = (levelD - 0.5) / rows;
+      for (let r = 0; r < rows; r++) {
+        const rz = z - levelD / 2 + 0.35 + rowStep * (r + 0.5);
+        const ridge = new THREE.Mesh(new THREE.BoxGeometry(cfg.w - 0.8, 0.16, rowStep * 0.5), mat(palette.soilDark));
+        ridge.position.set(0, y + 0.2, rz);
+        g.add(ridge);
+        const n = Math.round((cfg.w - 1.4) / 1.1);
+        for (let k = 0; k < n; k++) {
+          const x = -(cfg.w - 1.4) / 2 + k * 1.1 + (rand() - 0.5) * 0.2;
+          const plant = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.8, 5), mat(palette.cropGreen));
+          plant.position.set(x, y + 0.6, rz + (rand() - 0.5) * 0.18);
+          plant.rotation.y = rand() * Math.PI;
+          g.add(plant);
+        }
+      }
+    }
+    g.rotation.y = cfg.rot ?? 0;
+    return shade(g);
+  }
+
+  // ---------- 植被 ----------
   function makeTree(rand, opts = {}) {
     const g = new THREE.Group();
     const height = opts.height ?? 3.2 + rand() * 2.0;
@@ -54,6 +765,62 @@ export function createAssets(palette) {
       blob.rotation.set(rand() * 0.6, rand() * Math.PI, rand() * 0.6);
       g.add(blob);
     }
+    return shade(g);
+  }
+
+  function makeBanyan(rand) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(banyanTrunkGeo, mat(palette.trunkDark)));
+
+    const canopyMat = mat(palette.banyanLeaf);
+    const blobs = 5 + Math.floor(rand() * 3);
+    for (let i = 0; i < blobs; i++) {
+      const a = (i / blobs) * Math.PI * 2;
+      const r = i === 0 ? 0 : 1.1 + rand() * 0.7;
+      const blob = new THREE.Mesh(banyanCanopyGeo, canopyMat);
+      const s = 1.5 + rand() * 0.7;
+      blob.scale.set(s, s * (0.75 + rand() * 0.2), s);
+      blob.position.set(Math.cos(a) * r, 3.1 + (i === 0 ? 0.35 : 0), Math.sin(a) * r);
+      blob.rotation.y = rand() * Math.PI;
+      g.add(blob);
+    }
+    for (let i = 0; i < 5; i++) {
+      const a = rand() * Math.PI * 2;
+      const r = 1.2 + rand() * 1.4;
+      const root = new THREE.Mesh(banyanRootGeo, mat(palette.trunkDark));
+      root.position.set(Math.cos(a) * r, 2.05, Math.sin(a) * r);
+      g.add(root);
+    }
+    return shade(g);
+  }
+
+  function makeBanana(rand) {
+    const g = new THREE.Group();
+    const stems = 2 + Math.floor(rand() * 2);
+    for (let i = 0; i < stems; i++) {
+      const a = (i / stems) * Math.PI * 2 + rand();
+      const x = Math.cos(a) * 0.35;
+      const z = Math.sin(a) * 0.35;
+      const scale = 0.8 + rand() * 0.45;
+      const stem = new THREE.Mesh(bananaStemGeo, mat(palette.bananaStem));
+      stem.position.set(x, 0, z);
+      stem.scale.set(1, scale, 1);
+      g.add(stem);
+      const crown = new THREE.Mesh(bananaCrownGeo, doubleSideMat(palette.bananaLeaf));
+      crown.position.set(x, 2.0 * scale, z);
+      crown.rotation.y = rand() * Math.PI;
+      crown.scale.setScalar(scale * (0.9 + rand() * 0.3));
+      g.add(crown);
+    }
+    return shade(g);
+  }
+
+  function makeBamboo(rand) {
+    const g = new THREE.Group();
+    const clump = new THREE.Mesh(bambooClumpGeo, mat(palette.bamboo));
+    clump.rotation.y = rand() * Math.PI;
+    clump.scale.setScalar(0.75 + rand() * 0.5);
+    g.add(clump);
     return shade(g);
   }
 
@@ -111,443 +878,58 @@ export function createAssets(palette) {
     return g;
   }
 
-  // ---------- 农家小院 ----------
-  function makeFarmhouse(rand, cfg) {
-    const g = new THREE.Group();
-    const { w, d, wallH, roofH } = cfg;
-    const roofColor = palette.roofColors[cfg.roof % palette.roofColors.length];
-
-    const foundation = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.5, d + 0.5), mat(palette.foundation));
-    foundation.position.y = 0.25;
-    g.add(foundation);
-
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), mat(rand() < 0.5 ? palette.wall : palette.wallAlt));
-    walls.position.y = 0.5 + wallH / 2;
-    g.add(walls);
-
-    const roof = new THREE.Mesh(gableRoofGeometry(w, roofH, d, 0.45), mat(roofColor));
-    roof.position.y = 0.5 + wallH;
-    g.add(roof);
-
-    // 门
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.95, 0.16), mat(palette.woodDark));
-    door.position.set(0, 0.5 + 0.98, d / 2 + 0.02);
-    g.add(door);
-    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), mat(palette.trunkDark));
-    knob.position.set(0.4, 0.5 + 1.0, d / 2 + 0.12);
-    g.add(knob);
-
-    // 窗户（每面 1-2 个）
-    const winMat = mat('#FFF3CF');
-    const frameMat = mat(palette.wood);
-    const addWindow = (x, y, z, ry = 0) => {
-      const win = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 0.14), winMat);
-      win.position.set(x, y, z);
-      win.rotation.y = ry;
-      g.add(win);
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.3, 0.1), frameMat);
-      frame.position.set(x, y, z);
-      frame.rotation.y = ry;
-      frame.position.add(new THREE.Vector3(Math.sin(ry) * 0.04, 0, Math.cos(ry) * 0.04));
-      g.add(frame);
-      const barV = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.2, 0.2), frameMat);
-      barV.position.set(x, y, z);
-      barV.rotation.y = ry;
-      g.add(barV);
-    };
-    addWindow(w / 2 + 0.02, 0.5 + wallH * 0.58, d * 0.18, Math.PI / 2);
-    addWindow(-w / 2 - 0.02, 0.5 + wallH * 0.58, d * 0.18, Math.PI / 2);
-    addWindow(w * 0.28, 0.5 + wallH * 0.58, d / 2 + 0.02, 0);
-
-    // 烟囱
-    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.7, 0.75), mat(palette.foundation));
-    chimney.position.set(-w * 0.28, 0.5 + wallH + roofH * 0.62, d * 0.1);
-    g.add(chimney);
-    const smokeCap = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.18, 0.95), mat(palette.cliff));
-    smokeCap.position.set(-w * 0.28, 0.5 + wallH + roofH * 0.62 + 0.9, d * 0.1);
-    g.add(smokeCap);
-
-    g.rotation.y = cfg.rot ?? 0;
-    return shade(g);
-  }
-
-  // 院子栅栏（矩形一圈）
-  function makeYardFence(w, d, opts = {}) {
-    const g = new THREE.Group();
-    const postMat = mat(palette.fence);
-    const railMat = mat(palette.wood);
-    const h = opts.height ?? 1.0;
-    const gaps = opts.gaps ?? [];
-    const inGap = (x, z) => gaps.some((gp) => Math.hypot(x - gp.x, z - gp.z) < (gp.r ?? 2.0));
-
-    const postGeo = new THREE.BoxGeometry(0.16, h, 0.16);
-    const railGeoX = new THREE.BoxGeometry(1, 0.12, 0.1);
-    const railGeoZ = new THREE.BoxGeometry(0.1, 0.12, 1);
-
-    const step = 1.6;
-    const nx = Math.max(2, Math.round(w / step));
-    const nz = Math.max(2, Math.round(d / step));
-
-    for (let i = 0; i <= nx; i++) {
-      const x = -w / 2 + (i / nx) * w;
-      for (const z of [-d / 2, d / 2]) {
-        if (inGap(x, z)) continue;
-        const p = new THREE.Mesh(postGeo, postMat);
-        p.position.set(x, h / 2, z);
-        g.add(p);
-      }
-      if (i < nx) {
-        const seg = w / nx;
-        for (const z of [-d / 2, d / 2]) {
-          if (inGap(x + seg / 2, z) || inGap(x, z) || inGap(x + seg, z)) continue;
-          for (const yy of [h * 0.45, h * 0.8]) {
-            const r = new THREE.Mesh(railGeoX, railMat);
-            r.scale.x = seg;
-            r.position.set(x + seg / 2, yy, z);
-            g.add(r);
-          }
-        }
-      }
-    }
-    for (let j = 0; j <= nz; j++) {
-      const z = -d / 2 + (j / nz) * d;
-      for (const x of [-w / 2, w / 2]) {
-        if (inGap(x, z)) continue;
-        const p = new THREE.Mesh(postGeo, postMat);
-        p.position.set(x, h / 2, z);
-        g.add(p);
-      }
-      if (j < nz) {
-        const seg = d / nz;
-        for (const x of [-w / 2, w / 2]) {
-          if (inGap(x, z + seg / 2) || inGap(x, z) || inGap(x, z + seg)) continue;
-          for (const yy of [h * 0.45, h * 0.8]) {
-            const r = new THREE.Mesh(railGeoZ, railMat);
-            r.scale.z = seg;
-            r.position.set(x, yy, z + seg / 2);
-            g.add(r);
-          }
-        }
-      }
-    }
-    return shade(g);
-  }
-
-  // ---------- 灯塔（地标） ----------
-  function makeLighthouse(cfg) {
-    const g = new THREE.Group();
-    const H = cfg.height ?? 15;
-    const bodyH = H - 4.2;
-    const redMat = mat(palette.lighthouseRed);
-    const whiteMat = mat(palette.lighthouseWhite);
-
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.9, 1.6, 10), mat(palette.foundation));
-    base.position.y = 0.8;
-    g.add(base);
-
-    // 白/红交替柱身
-    const bands = 5;
-    const bandH = bodyH / bands;
-    for (let i = 0; i < bands; i++) {
-      const rBottom = 1.85 - (i / bands) * 0.55;
-      const rTop = 1.85 - ((i + 1) / bands) * 0.55;
-      const seg = new THREE.Mesh(
-        new THREE.CylinderGeometry(rTop, rBottom, bandH, 10, 1),
-        i % 2 === 0 ? whiteMat : redMat
-      );
-      seg.position.y = 1.6 + bandH * (i + 0.5);
-      g.add(seg);
-    }
-
-    const galleryY = 1.6 + bodyH;
-    const gallery = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 1.8, 0.45, 10), mat(palette.cliff));
-    gallery.position.y = galleryY + 0.2;
-    g.add(gallery);
-
-    // 栏杆
-    const railCount = 10;
-    for (let i = 0; i < railCount; i++) {
-      const a = (i / railCount) * Math.PI * 2;
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.75, 0.1), whiteMat);
-      post.position.set(Math.cos(a) * 1.85, galleryY + 0.8, Math.sin(a) * 1.85);
-      g.add(post);
-    }
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.85, 0.07, 5, 14), whiteMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = galleryY + 1.15;
-    g.add(ring);
-
-    // 灯室
-    const lantern = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.3, 2.0, 8), mat('#FFE9A8', { emissive: new THREE.Color('#FFD98A'), emissiveIntensity: 0.35 }));
-    lantern.position.y = galleryY + 1.5;
-    g.add(lantern);
-
-    const top = new THREE.Mesh(new THREE.ConeGeometry(1.7, 1.5, 8), redMat);
-    top.position.y = galleryY + 3.25;
-    g.add(top);
-    const finial = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), mat(palette.woodDark));
-    finial.position.y = galleryY + 4.1;
-    g.add(finial);
-
-    // 门
-    const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8, 0.3), mat(palette.woodDark));
-    door.position.set(0, 1.1, 2.3);
-    g.add(door);
-
-    const light = new THREE.PointLight(new THREE.Color('#FFD98A'), 0, 46, 1.6);
-    light.position.y = galleryY + 1.5;
-    g.add(light);
-
-    return { group: shade(g), light };
-  }
-
-  // ---------- 栈桥 + 小船 ----------
-  function makeDock(cfg) {
-    const g = new THREE.Group();
-    const L = cfg.length ?? 14;
-    const W = cfg.width ?? 2.6;
-    const plankMat = mat(palette.wood);
-    const postMat = mat(palette.woodDark);
-
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.22, L), plankMat);
-    deck.position.set(0, 1.1, -L / 2);
-    g.add(deck);
-
-    for (let i = 0; i < Math.round(L / 2.2); i++) {
-      const z = -1 - i * 2.2;
-      for (const x of [-W / 2 + 0.2, W / 2 - 0.2]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 2.4, 6), postMat);
-        post.position.set(x, -0.15, z);
-        g.add(post);
-      }
-    }
-    return shade(g);
-  }
-
-  function makeBoat() {
-    const g = new THREE.Group();
-    const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.0, 3.6, 7, 1, false, 0, Math.PI), mat(palette.wood));
-    hull.rotation.z = Math.PI / 2;
-    hull.rotation.y = Math.PI / 2;
-    hull.position.y = 0.45;
-    hull.scale.set(1, 1, 0.55);
-    g.add(hull);
-    const rim = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.16, 1.15), mat(palette.woodDark));
-    rim.position.y = 0.62;
-    g.add(rim);
-    for (const x of [-0.9, 0, 0.9]) {
-      const bench = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.12, 1.0), mat(palette.trunkDark));
-      bench.position.set(x, 0.5, 0);
-      g.add(bench);
-    }
-    return shade(g);
-  }
-
-  // ---------- 生活小景 ----------
-  function makeWell() {
-    const g = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.25, 1.1, 10), mat(palette.foundation));
-    ring.position.y = 0.55;
-    g.add(ring);
-    const water = new THREE.Mesh(new THREE.CircleGeometry(0.95, 10), mat(palette.waterPond));
-    water.rotation.x = -Math.PI / 2;
-    water.position.y = 1.05;
-    g.add(water);
-    for (const x of [-1.0, 1.0]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.2, 0.16), mat(palette.woodDark));
-      post.position.set(x, 1.1, 0);
-      g.add(post);
-    }
-    const roof = new THREE.Mesh(gableRoofGeometry(2.9, 0.8, 2.0, 0.25), mat(palette.roofColors[1]));
-    roof.position.y = 2.2;
-    g.add(roof);
-    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.24, 0.42, 8), mat(palette.wood));
-    bucket.position.set(0, 1.5, 0);
-    g.add(bucket);
-    return shade(g);
-  }
-
-  function makeMillstone() {
-    const g = new THREE.Group();
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.5, 10), mat(palette.rockColor));
-    base.position.y = 0.25;
-    g.add(base);
-    const stone = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.28, 10), mat(palette.cliff));
-    stone.position.y = 0.62;
-    stone.rotation.z = 0.12;
-    g.add(stone);
-    const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.4, 6), mat(palette.woodDark));
-    hole.position.set(0.55, 0.72, 0);
-    g.add(hole);
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.12), mat(palette.wood));
-    handle.position.set(1.3, 0.72, 0);
-    g.add(handle);
-    return shade(g);
-  }
-
-  function makeBarrel() {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.95, 9), mat(palette.wood));
-    body.position.y = 0.48;
-    g.add(body);
-    for (const y of [0.15, 0.8]) {
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.09, 9), mat(palette.woodDark));
-      band.position.y = y;
-      g.add(band);
-    }
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.07, 9), mat(palette.trunkDark));
-    top.position.y = 0.97;
-    g.add(top);
-    return shade(g);
-  }
-
-  function makePumpkin(rand) {
-    const g = new THREE.Group();
-    const s = 0.35 + rand() * 0.18;
-    const body = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), mat('#E8813A'));
-    body.scale.set(1, 0.78, 1);
-    body.position.y = s * 0.78;
-    g.add(body);
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.22, 5), mat(palette.grassDark));
-    stem.position.y = s * 1.55;
-    g.add(stem);
-    return shade(g);
-  }
-
-  function makeHaystack(rand) {
-    const g = new THREE.Group();
-    const r = 1.0 + rand() * 0.5;
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r, 1.7, 8), mat('#E8C46A'));
-    body.position.y = 0.85;
-    g.add(body);
-    const top = new THREE.Mesh(new THREE.ConeGeometry(r * 0.62, 0.7, 8), mat('#D9B25A'));
-    top.position.y = 2.0;
-    g.add(top);
-    return shade(g);
-  }
-
-  function makeBench() {
-    const g = new THREE.Group();
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.14, 0.6), mat(palette.wood));
-    seat.position.y = 0.55;
-    g.add(seat);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.12), mat(palette.wood));
-    back.position.set(0, 0.95, -0.26);
-    g.add(back);
-    for (const x of [-0.8, 0.8]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.55, 0.5), mat(palette.woodDark));
-      leg.position.set(x, 0.28, 0);
-      g.add(leg);
-    }
-    return shade(g);
-  }
-
-  function makeLamp() {
-    const g = new THREE.Group();
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 3.4, 6), mat(palette.woodDark));
-    pole.position.y = 1.7;
-    g.add(pole);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.1), mat(palette.woodDark));
-    arm.position.set(0.32, 3.35, 0);
-    g.add(arm);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.42), mat('#FFE9A8', { emissive: new THREE.Color('#FFD98A'), emissiveIntensity: 0.3 }));
-    head.position.set(0.6, 3.1, 0);
-    g.add(head);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.26, 4), mat(palette.roofColors[2]));
-    cap.position.set(0.6, 3.48, 0);
-    cap.rotation.y = Math.PI / 4;
-    g.add(cap);
-    const light = new THREE.PointLight(new THREE.Color('#FFCF7A'), 0, 16, 1.8);
-    light.position.set(0.6, 3.0, 0);
-    g.add(light);
-    return { group: shade(g), light };
-  }
-
-  function makeClothesline() {
-    const g = new THREE.Group();
-    for (const x of [-2.2, 2.2]) {
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.3, 5), mat(palette.woodDark));
-      pole.position.set(x, 1.15, 0);
-      g.add(pole);
-    }
-    const line = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.04, 0.04), mat(palette.trunkDark));
-    line.position.y = 2.1;
-    g.add(line);
-    const colors = [palette.wall, palette.roofColors[0], palette.roofColors[2], palette.lighthouseWhite];
-    for (let i = 0; i < 4; i++) {
-      const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.75, 0.06), mat(colors[i % colors.length]));
-      cloth.position.set(-1.6 + i * 1.05, 1.72, 0);
-      cloth.rotation.z = (i % 2 ? 1 : -1) * 0.03;
-      g.add(cloth);
-    }
-    return shade(g);
-  }
-
-  function makeMailbox() {
-    const g = new THREE.Group();
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.13, 1.2, 0.13), mat(palette.woodDark));
-    pole.position.y = 0.6;
-    g.add(pole);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.42, 0.75), mat(palette.roofColors[2]));
-    box.position.y = 1.35;
-    g.add(box);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.1, 0.8), mat(palette.roofColors[0]));
-    roof.position.y = 1.59;
-    g.add(roof);
-    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.18), mat(palette.lighthouseRed));
-    flag.position.set(0.28, 1.55, -0.2);
-    g.add(flag);
-    return shade(g);
-  }
-
-  function makeCropField(rand, cfg) {
-    const g = new THREE.Group();
-    const soil = new THREE.Mesh(new THREE.BoxGeometry(cfg.w, 0.35, cfg.d), mat(palette.soil));
-    soil.position.y = 0.18;
-    g.add(soil);
-    const rows = cfg.rows ?? 6;
-    const rowStep = cfg.d / rows;
-    for (let r = 0; r < rows; r++) {
-      const z = -cfg.d / 2 + rowStep * (r + 0.5);
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(cfg.w - 1.0, 0.22, rowStep * 0.55), mat(palette.soil));
-      ridge.position.set(0, 0.42, z);
-      g.add(ridge);
-      const n = Math.round((cfg.w - 1.5) / 1.1);
-      for (let i = 0; i < n; i++) {
-        const x = -(cfg.w - 1.5) / 2 + i * 1.1 + (rand() - 0.5) * 0.2;
-        const plant = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.85, 5), mat(palette.cropGreen));
-        plant.position.set(x, 0.85, z + (rand() - 0.5) * 0.2);
-        plant.rotation.y = rand() * Math.PI;
-        g.add(plant);
-      }
-    }
-    g.rotation.y = cfg.rot ?? 0;
-    return shade(g);
-  }
-
   return {
     mat,
-    geos: { trunkGeo, canopyRound, canopyFacet, canopyTall, bushGeo, bushSmallGeo, rockGeo, stoneGeoS, stumpGeo, stumpTopGeo, stemGeo, bloomGeo, tuftGeo },
+    geos: {
+      trunkGeo,
+      canopyRound,
+      canopyFacet,
+      canopyTall,
+      bushGeo,
+      bushSmallGeo,
+      rockGeo,
+      stoneGeoS,
+      stumpGeo,
+      stumpTopGeo,
+      stemGeo,
+      bloomGeo,
+      tuftGeo,
+      banyanTrunkGeo,
+      banyanCanopyGeo,
+      banyanRootGeo,
+      bananaStemGeo,
+      bananaCrownGeo,
+      bambooClumpGeo,
+      netLatticeGeo
+    },
     makeTree,
+    makeBanyan,
+    makeBanana,
+    makeBamboo,
     makeBush,
     makeRock,
     makeFlower,
     makeStump,
     makeGrassTuft,
-    makeFarmhouse,
-    makeYardFence,
-    makeLighthouse,
-    makeDock,
-    makeBoat,
+    makeStoneHouse,
+    makeStoneWallYard,
+    makeBeaconTower,
+    makeShrine,
+    makeStonePier,
+    makeFishingBoat,
+    makeNetRack,
+    makeDryingRack,
+    makeWaterJar,
+    makeBasket,
+    makeStoneBench,
+    makeLanternPost,
     makeWell,
     makeMillstone,
     makeBarrel,
     makePumpkin,
     makeHaystack,
-    makeBench,
-    makeLamp,
     makeClothesline,
     makeMailbox,
-    makeCropField
+    makeTerraceField
   };
 }

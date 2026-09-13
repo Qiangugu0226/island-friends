@@ -28,15 +28,24 @@ export function buildLayout(cfg) {
     return { ...b, index: i, padR, y: rawHeight(b.x, b.z) };
   });
 
-  // 地标也需要一块平地（灯塔 / 菜地）
+  // 地标也需要一块平地（航标塔 / 土地庙 / 菜地）
   const landmarkPads = [];
-  if (cfg.lighthouse) {
+  if (cfg.beaconTower) {
     landmarkPads.push({
-      x: cfg.lighthouse.x,
-      z: cfg.lighthouse.z,
+      x: cfg.beaconTower.x,
+      z: cfg.beaconTower.z,
       padR: 9.0,
-      y: rawHeight(cfg.lighthouse.x, cfg.lighthouse.z),
-      kind: 'lighthouse'
+      y: rawHeight(cfg.beaconTower.x, cfg.beaconTower.z),
+      kind: 'beacon'
+    });
+  }
+  if (cfg.shrine) {
+    landmarkPads.push({
+      x: cfg.shrine.x,
+      z: cfg.shrine.z,
+      padR: 6.5,
+      y: rawHeight(cfg.shrine.x, cfg.shrine.z),
+      kind: 'shrine'
     });
   }
   if (cfg.cropField) {
@@ -128,7 +137,8 @@ export function buildLayout(cfg) {
 
   for (const pad of pads) exclusions.push({ x: pad.x, z: pad.z, r: pad.padR + 1.4, kind: 'pad' });
   for (const p of ponds) exclusions.push({ x: p.x, z: p.z, r: p.r + 1.6, kind: 'pond' });
-  if (cfg.lighthouse) exclusions.push({ x: cfg.lighthouse.x, z: cfg.lighthouse.z, r: 11, kind: 'lighthouse' });
+  if (cfg.beaconTower) exclusions.push({ x: cfg.beaconTower.x, z: cfg.beaconTower.z, r: 11, kind: 'beacon' });
+  if (cfg.shrine) exclusions.push({ x: cfg.shrine.x, z: cfg.shrine.z, r: 8, kind: 'shrine' });
   if (cfg.dock) exclusions.push({ x: cfg.dock.x, z: cfg.dock.z, r: 14, kind: 'dock' });
   if (cfg.cropField) exclusions.push({ x: cfg.cropField.x, z: cfg.cropField.z, r: Math.max(cfg.cropField.w, cfg.cropField.d) * 0.7, kind: 'crop' });
   if (cfg.gallery) exclusions.push({ x: cfg.gallery.x, z: cfg.gallery.z, r: 60, kind: 'gallery' });

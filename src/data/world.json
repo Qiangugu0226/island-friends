@@ -1,5 +1,6 @@
 {
-  "_说明": "P1 全部可调参数都在这里。改这个文件不需要动代码，刷新页面即生效。坐标单位=米，x/z 是水平平面，y 向上。",
+  "_说明": "P1.5 全部可调参数都在这里。改这个文件不需要动代码，刷新页面即生效。坐标单位=米，x/z 是水平平面，y 向上。",
+  "_设定": "中国东南沿海渔村小岛（石厝 / 燕尾脊 / 航标塔 / 土地庙 / 石阶码头 / 渔网），配色走童话化的暖奶油+青绿体系。",
 
   "seed": 20260913,
 
@@ -18,7 +19,7 @@
   },
 
   "palette": {
-    "_说明": "色板。全部取自参考图 Explore! Piggy Island 的暖奶油 + 青绿 + 黄绿体系。",
+    "_说明": "色板。天空/海/草/沙沿用 P1 的童话配色；建筑改为灰瓦石墙 + 朱红点缀的渔村体系。",
     "skyTop": "#F9EBCB",
     "skyHorizon": "#F6D79C",
     "sunLight": "#FFF4DA",
@@ -28,6 +29,7 @@
     "waterShallow": "#5FD0DE",
     "waterDeep": "#2AA6C4",
     "waterPond": "#4FC3D4",
+
     "grassLight": "#B7D14C",
     "grassMid": "#9FC03C",
     "grassDark": "#7E9C31",
@@ -36,24 +38,49 @@
     "sandWet": "#D2953F",
     "rock": "#C6BDA8",
     "cliff": "#B7A681",
+
+    "leafColors": ["#E8622C", "#D8452F", "#F2B33D", "#5FA83C", "#84B93F", "#EBB23A", "#C4CF4A"],
     "trunk": "#E4D2A0",
     "trunkDark": "#C9AE74",
-    "leafColors": ["#E8622C", "#D8452F", "#F2B33D", "#5FA83C", "#84B93F", "#EBB23A", "#C4CF4A"],
     "bushColor": "#6F9B39",
     "rockColor": "#C6BDA8",
     "flowerColors": ["#F26D8D", "#F2C33D", "#E8622C", "#9B7BD4", "#FDF6E6"],
-    "wall": "#F7EDD6",
-    "wallAlt": "#F2E2C4",
-    "wallShadow": "#E7D8BB",
-    "foundation": "#D9CBB0",
+
+    "wallWhite": "#F3EEE1",
+    "wallStone": "#C7C0B2",
+    "wallStoneAlt": "#B9B1A2",
+    "wallBrick": "#B5644A",
+    "wallBrickDark": "#A2543D",
+    "roofTile": "#8B9095",
+    "roofTileDark": "#6E7378",
+    "roofRed": "#B4553F",
+    "ridgeColor": "#B4553F",
+    "timber": "#8A5A3B",
+    "timberDark": "#5E3B27",
+    "stone": "#BFB8AA",
+    "stoneDark": "#9E9788",
+    "lanternRed": "#D9453A",
+    "gold": "#E0B457",
+    "bamboo": "#A9B96B",
+    "bambooDark": "#8A9A4E",
+    "banyanLeaf": "#4E7A3A",
+    "bananaLeaf": "#6FA83C",
+    "bananaStem": "#8FA85A",
+    "netColor": "#C9C3A8",
+    "clay": "#A9703F",
+    "clayDark": "#8E5B32",
+    "indigo": "#3E5A7A",
+    "indigoLight": "#7E9AB5",
+    "fishColor": "#9FB0B8",
+    "soil": "#A9743F",
+    "soilDark": "#8E5F33",
+    "cropGreen": "#7FB03C",
+
+    "lighthouseWhite": "#FBF6EC",
     "wood": "#C08F58",
     "woodDark": "#96693C",
-    "fence": "#EADCB8",
-    "roofColors": ["#D9534F", "#E8B44A", "#4FA3A5", "#7FB05A"],
-    "lighthouseRed": "#E0453A",
-    "lighthouseWhite": "#FBF6EC",
-    "soil": "#A9743F",
-    "cropGreen": "#7FB03C",
+    "foundation": "#D9CBB0",
+
     "playerShirt": "#E8623C",
     "playerPants": "#5F6E92",
     "playerSkin": "#F3C99E",
@@ -76,14 +103,18 @@
   },
 
   "scatter": {
-    "_说明": "程序化散布数量。区域避让（路面/院子/池塘/栈桥）是自动的。想加密就调大数字。",
-    "trees": 265,
+    "_说明": "程序化散布数量。区域避让（路面/院子/池塘/码头）自动。榕树/芭蕉/竹丛是渔村特有的几层。",
+    "trees": 235,
+    "banyans": 26,
+    "bananas": 48,
+    "bamboos": 62,
     "bushes": 340,
     "rocks": 46,
-    "flowers": 260,
-    "stumps": 48,
+    "flowers": 240,
+    "stumps": 44,
     "grassTufts": 900,
     "treeMinDistance": 4.2,
+    "banyanMinDistance": 13,
     "rockMinDistance": 3.2,
     "minTreeHeight": 2.3,
     "maxTreeHeight": 5.6
@@ -95,38 +126,43 @@
   ],
 
   "paths": [
-    { "width": 2.4, "points": [[-50, 33], [-34, 24], [-20, 12], [-10, 2], [-3, -12], [-1, -30], [0, -44]] },
-    { "width": 2.1, "points": [[-10, 2], [-2, 12], [9, 19], [21, 21]] },
-    { "width": 2.1, "points": [[-3, -12], [10, -16], [22, -18], [33, -15]] },
-    { "width": 1.9, "points": [[9, 19], [14, 27], [16.5, 28.5]] },
-    { "width": 1.9, "points": [[-20, 12], [-26, 20], [-31, 27]] }
+    { "width": 2.6, "points": [[-50, 33], [-34, 24], [-20, 12], [-10, 2], [-3, -12], [-1, -30], [0, -44]] },
+    { "width": 2.3, "points": [[-10, 2], [-2, 12], [9, 19], [21, 21]] },
+    { "width": 2.3, "points": [[-3, -12], [10, -16], [22, -18], [33, -15]] },
+    { "width": 2.0, "points": [[9, 19], [14, 27], [16.5, 28.5]] },
+    { "width": 2.0, "points": [[-20, 12], [-26, 20], [-31, 27]] }
   ],
 
   "buildings": [
-    { "id": "house-red",    "x": -31, "z": 27, "rot": 0.42,  "w": 9.0, "d": 7.4, "wallH": 3.4, "roofH": 2.6, "roof": 0 },
-    { "id": "house-yellow", "x": 21,  "z": 21, "rot": -0.28, "w": 8.4, "d": 7.0, "wallH": 3.2, "roofH": 2.5, "roof": 1 },
-    { "id": "house-teal",   "x": 33,  "z": -15, "rot": 0.95, "w": 8.8, "d": 7.2, "wallH": 3.3, "roofH": 2.6, "roof": 2 },
-    { "id": "house-green",  "x": -12, "z": -24, "rot": -0.65, "w": 9.2, "d": 7.6, "wallH": 3.5, "roofH": 2.7, "roof": 3 }
+    { "id": "house-stone", "style": "stone", "x": -31, "z": 27, "rot": 0.42,  "w": 9.0, "d": 7.4, "wallH": 3.4, "roofH": 2.6, "roofTile": "#8B9095", "ridge": "#B4553F" },
+    { "id": "house-white", "style": "white", "x": 21,  "z": 21, "rot": -0.28, "w": 8.4, "d": 7.0, "wallH": 3.2, "roofH": 2.5, "roofTile": "#6E7378", "ridge": "#B4553F" },
+    { "id": "house-brick", "style": "brick", "x": 33,  "z": -15, "rot": 0.95, "w": 8.8, "d": 7.2, "wallH": 3.3, "roofH": 2.6, "roofTile": "#8B9095", "ridge": "#D9453A" },
+    { "id": "house-stone2", "style": "stone", "x": -12, "z": -24, "rot": -0.65, "w": 9.2, "d": 7.6, "wallH": 3.5, "roofH": 2.7, "roofTile": "#9AA0A4", "ridge": "#B4553F" }
   ],
 
-  "lighthouse": { "x": 0, "z": -47, "height": 15.5, "rot": 0.0 },
+  "beaconTower": { "_说明": "航标塔（原灯塔位置），岛上地标", "x": 0, "z": -47, "height": 14.5, "rot": 0.0 },
 
-  "dock": { "x": -60, "z": 22, "rot": -0.28, "length": 16.0, "width": 2.6 },
+  "shrine": { "_说明": "土地庙，放在村口主干道旁", "x": -17, "z": 5.5, "rot": 1.35 },
 
-  "cropField": { "x": 6, "z": 42, "w": 15, "d": 9, "rot": 0.18, "rows": 6 },
+  "dock": { "_说明": "石阶码头", "x": -60, "z": 22, "rot": -0.28, "length": 16.0, "width": 3.0 },
+
+  "cropField": { "_说明": "梯田菜畦", "x": 6, "z": 42, "w": 15, "d": 10, "rot": 0.18 },
 
   "props": {
-    "_说明": "小景与生活道具。位置都是初稿，随便挪。",
-    "well":      [{ "x": -16, "z": 9,  "rot": 0.3 }],
-    "millstone": [{ "x": -25, "z": 17, "rot": 0.0 }],
-    "haystacks": [{ "x": -12, "z": 37 }, { "x": -6, "z": 40 }, { "x": 15, "z": 52 }],
-    "pumpkins":  [{ "x": -26, "z": 34 }, { "x": -22, "z": 37 }, { "x": -29, "z": 38 }],
-    "barrels":   [{ "x": -33, "z": 21 }, { "x": -29, "z": 20 }, { "x": 18, "z": 24 }, { "x": 24, "z": 25 }, { "x": 30, "z": -11 }],
-    "benches":   [{ "x": -6, "z": 6, "rot": 1.6 }, { "x": 16, "z": 26, "rot": -0.6 }],
-    "lamps":     [{ "x": -10, "z": 2, "rot": 0 }, { "x": 9, "z": 19, "rot": 0 }, { "x": -3, "z": -12, "rot": 0 }, { "x": -1, "z": -30, "rot": 0 }, { "x": 21, "z": 21, "rot": 0 }],
-    "clotheslines": [{ "x": 26, "z": 15, "rot": -0.4 }],
-    "mailboxes": [{ "x": -36, "z": 24, "rot": 0.5 }, { "x": 16, "z": 18, "rot": -0.4 }],
-    "lilyPads":  [{ "pond": 0 }, { "pond": 1 }]
+    "_说明": "渔家小景。位置都是初稿，随便挪。",
+    "well":       [{ "x": -14, "z": 9.5, "rot": 0.3 }],
+    "millstone":  [{ "x": -25, "z": 17, "rot": 0.0 }],
+    "haystacks":  [{ "x": -12, "z": 37 }, { "x": -6, "z": 40 }, { "x": 15, "z": 52 }],
+    "pumpkins":   [{ "x": -26, "z": 34 }, { "x": -22, "z": 37 }, { "x": -29, "z": 38 }],
+    "barrels":    [{ "x": -33, "z": 21 }, { "x": -29, "z": 20 }, { "x": 18, "z": 24 }, { "x": 24, "z": 25 }, { "x": 30, "z": -11 }],
+    "benches":    [{ "x": -6, "z": 6, "rot": 1.6 }, { "x": 16, "z": 26, "rot": -0.6 }, { "x": -16, "z": 3.4, "rot": 1.2 }],
+    "lanternPosts": [{ "x": -10, "z": 2, "rot": 0 }, { "x": 9, "z": 19, "rot": 0 }, { "x": -3, "z": -12, "rot": 0 }, { "x": -1, "z": -30, "rot": 0 }, { "x": 21, "z": 21, "rot": 0 }, { "x": -18.4, "z": 8.2, "rot": 0 }],
+    "clotheslines": [{ "x": 26, "z": 15, "rot": -0.4 }, { "x": -28, "z": 31, "rot": 0.3 }],
+    "mailboxes":  [{ "x": -36, "z": 24, "rot": 0.5 }, { "x": 16, "z": 18, "rot": -0.4 }],
+    "netRacks":   [{ "x": -38, "z": 33, "rot": 0.9 }, { "x": -44, "z": 27, "rot": 0.5 }, { "x": 24, "z": -27, "rot": -0.7 }],
+    "dryingRacks": [{ "x": -34, "z": 29, "rot": 0.9 }, { "x": 20, "z": -24, "rot": -0.6 }, { "x": -42, "z": 30, "rot": 0.4 }],
+    "waterJars":  [{ "x": -30, "z": 24 }, { "x": -28, "z": 22.5 }, { "x": 18, "z": 22 }, { "x": 23, "z": 23.4 }, { "x": -13, "z": 11.5 }, { "x": 31, "z": -12.5 }],
+    "baskets":    [{ "x": -35, "z": 26 }, { "x": -32, "z": 30 }, { "x": 19, "z": 25.5 }, { "x": 26, "z": 22 }, { "x": -15, "z": 8 }, { "x": 17, "z": -22 }]
   },
 
   "time": {

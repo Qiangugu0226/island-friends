@@ -60,6 +60,13 @@ async function boot() {
   const assets = createAssets(palette);
   const terrain = createTerrain(layout, palette);
   scene.add(terrain.mesh);
+  const tBoot = performance.now();
+  const mark = (label) => {
+    if (params.has('probe') || params.has('timing')) {
+      console.log(`BOOT ${label}: ${(performance.now() - tBoot).toFixed(0)}ms`);
+    }
+  };
+  mark('terrain');
 
   if (params.has('probe')) {
     for (const [x, z] of [[-10, 6], [0, 0], [20, 15], [-16, 9], [-44, 30], [0, -47], [34, -14], [0, 40]]) {
@@ -111,15 +118,18 @@ async function boot() {
   }
   if (hide.includes('ponds')) ocean.pondGroup.visible = false;
   const sky = createSky(scene, cfg.dayPhases, palette);
+  mark('ocean+sky');
 
   hud.setLoading('正在种树、灌木、石头与野花…', 0.5);
   await nextFrame();
   const scatter = scatterWorld(scene, layout, assets, palette);
   if (hide.includes('scatter')) scatter.group.visible = false;
+  mark('scatter');
 
-  hud.setLoading('正在盖房子、立灯塔、修栈桥…', 0.72);
+  hud.setLoading('正在盖房子、立航标塔、修码头…', 0.72);
   await nextFrame();
   const structures = buildStructures(scene, layout, assets, palette);
+  mark('structures');
   if (hide.includes('structures')) structures.group.visible = false;
   if (hide.includes('terrain')) terrain.mesh.visible = false;
   const dbg = params.get('debug');
@@ -154,14 +164,29 @@ async function boot() {
 
   // ---------- 视角 ----------
   const viewInfo = {
-    follow: ['纯程序化生成 · 无外部美术资源', 'P1 交付：地形 / 沙滩 / 海水与浪花 / 房子 / 灯塔 / 栈桥 / 树草石花 / 玩家 / 昼夜'],
+    follow: ['纯程序化生成 · 无外部美术资源', 'P1.5 地方化：东南沿海渔村（石厝 / 燕尾脊 / 航标塔 / 土地庙 / 石阶码头 / 渔网）'],
     top: ['全岛俯瞰', '用来检查岛屿轮廓、沙滩与浪花描边、村落与道路布局'],
-    ground: ['地面视角', '靠近海边的低角度画面，检查海岸与灯塔剪影'],
+    ground: ['地面视角', '靠近海边的低角度画面，检查海岸与航标塔剪影'],
     gallery: [`资产总览（${gallery.itemCount} 件）`, '每一件资产都是代码生成的，逐件看、不满意就改']
   };
 
   if (params.has('view')) rig.setMode(params.get('view'));
   hud.setViewHint(...(viewInfo[rig.mode] ?? viewInfo.follow));
+
+  // 自由相机：?cam=x,y,z&look=x,y,z —— 我给资产拍特写 / 你排查画面都能用
+  const freeCam = { active: false, pos: new THREE.Vector3(), look: new THREE.Vector3() };
+  if (params.has('cam')) {
+    const [cx, cy, cz] = params.get('cam').split(',').map(Number);
+    freeCam.pos.set(cx, cy, cz);
+    freeCam.active = true;
+    if (params.has('look')) {
+      const [lx, ly, lz] = params.get('look').split(',').map(Number);
+      freeCam.look.set(lx, ly, lz);
+    } else {
+      freeCam.look.set(cx, 2, cz - 10);
+    }
+    rig.setMode('free');
+  }
 
   const blockers = structures.blockers;
   const focus = new THREE.Vector3();
@@ -217,6 +242,9 @@ async function boot() {
     if (rig.mode === 'gallery') {
       camera.position.lerp(gallery.cameraPos, 1 - Math.exp(-5 * dt));
       camera.lookAt(galleryLook);
+    } else if (rig.mode === 'free') {
+      camera.position.copy(freeCam.pos);
+      camera.lookAt(freeCam.look);
     } else if (rig.mode === 'follow') {
       resolveCamera(camera.position);
       camera.lookAt(player.position.x, player.position.y + 0.6, player.position.z);
