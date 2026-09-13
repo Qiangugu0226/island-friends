@@ -1,0 +1,165 @@
+{
+  "_说明": "P1 全部可调参数都在这里。改这个文件不需要动代码，刷新页面即生效。坐标单位=米，x/z 是水平平面，y 向上。",
+
+  "seed": 20260913,
+
+  "island": {
+    "_说明": "size 是地形网格覆盖范围；radius 是草地核心半径；falloff 是核心到深海的过渡带宽度；想改岛的大小就改这三个。当前约 125m 直径的可行走小岛。",
+    "size": 170,
+    "radius": 66,
+    "falloff": 17,
+    "resolution": 160,
+    "baseHeight": 2.6,
+    "hillHeight": 3.8,
+    "hillScale": 0.03,
+    "seabedDepth": -2.4,
+    "beachTop": 1.2,
+    "grassStart": 1.85
+  },
+
+  "palette": {
+    "_说明": "色板。全部取自参考图 Explore! Piggy Island 的暖奶油 + 青绿 + 黄绿体系。",
+    "skyTop": "#F9EBCB",
+    "skyHorizon": "#F6D79C",
+    "sunLight": "#FFF4DA",
+    "ambientSky": "#CDE3EA",
+    "ambientGround": "#C9B98A",
+    "foam": "#FFFFFF",
+    "waterShallow": "#5FD0DE",
+    "waterDeep": "#2AA6C4",
+    "waterPond": "#4FC3D4",
+    "grassLight": "#B7D14C",
+    "grassMid": "#9FC03C",
+    "grassDark": "#7E9C31",
+    "sandLight": "#F2CE86",
+    "sandDark": "#E0A94F",
+    "sandWet": "#D2953F",
+    "rock": "#C6BDA8",
+    "cliff": "#B7A681",
+    "trunk": "#E4D2A0",
+    "trunkDark": "#C9AE74",
+    "leafColors": ["#E8622C", "#D8452F", "#F2B33D", "#5FA83C", "#84B93F", "#EBB23A", "#C4CF4A"],
+    "bushColor": "#6F9B39",
+    "rockColor": "#C6BDA8",
+    "flowerColors": ["#F26D8D", "#F2C33D", "#E8622C", "#9B7BD4", "#FDF6E6"],
+    "wall": "#F7EDD6",
+    "wallAlt": "#F2E2C4",
+    "wallShadow": "#E7D8BB",
+    "foundation": "#D9CBB0",
+    "wood": "#C08F58",
+    "woodDark": "#96693C",
+    "fence": "#EADCB8",
+    "roofColors": ["#D9534F", "#E8B44A", "#4FA3A5", "#7FB05A"],
+    "lighthouseRed": "#E0453A",
+    "lighthouseWhite": "#FBF6EC",
+    "soil": "#A9743F",
+    "cropGreen": "#7FB03C",
+    "playerShirt": "#E8623C",
+    "playerPants": "#5F6E92",
+    "playerSkin": "#F3C99E",
+    "playerHair": "#5B3A2E",
+    "playerPack": "#8FBF6A"
+  },
+
+  "dayPhases": {
+    "_说明": "昼夜配色关键帧（按小时）。HUD 里的时间会在这几个关键帧之间插值。",
+    "keyframes": [
+      { "hour": 0,  "skyTop": "#22305A", "skyHorizon": "#3E4E7E", "sun": "#9DB4E0", "sunIntensity": 0.26, "ambient": "#3A4874", "ambientIntensity": 0.52, "fog": "#2B3760", "phase": "夜晚" },
+      { "hour": 5,  "skyTop": "#3B4A76", "skyHorizon": "#8A7C93", "sun": "#C6A38C", "sunIntensity": 0.30, "ambient": "#4A5473", "ambientIntensity": 0.48, "fog": "#6B6B85", "phase": "黎明" },
+      { "hour": 7,  "skyTop": "#F6DFB4", "skyHorizon": "#F5C892", "sun": "#FFD9A8", "sunIntensity": 0.68, "ambient": "#C9D6DC", "ambientIntensity": 0.40, "fog": "#F0D3A6", "phase": "清晨" },
+      { "hour": 12, "skyTop": "#F9EBCB", "skyHorizon": "#F6D79C", "sun": "#FFF4DA", "sunIntensity": 0.95, "ambient": "#CDE3EA", "ambientIntensity": 0.42, "fog": "#F2DFB6", "phase": "白天" },
+      { "hour": 17, "skyTop": "#F7DFB2", "skyHorizon": "#F1C187", "sun": "#FFD79C", "sunIntensity": 0.80, "ambient": "#D2DCD8", "ambientIntensity": 0.40, "fog": "#EFD1A2", "phase": "傍晚" },
+      { "hour": 19, "skyTop": "#8A6E86", "skyHorizon": "#E79B62", "sun": "#FFB067", "sunIntensity": 0.44, "ambient": "#8E7E8C", "ambientIntensity": 0.36, "fog": "#C08F7C", "phase": "黄昏" },
+      { "hour": 21, "skyTop": "#2B3A66", "skyHorizon": "#5A5480", "sun": "#9DB4E0", "sunIntensity": 0.26, "ambient": "#3F4C78", "ambientIntensity": 0.52, "fog": "#3B4368", "phase": "夜晚" },
+      { "hour": 24, "skyTop": "#22305A", "skyHorizon": "#3E4E7E", "sun": "#9DB4E0", "sunIntensity": 0.26, "ambient": "#3A4874", "ambientIntensity": 0.52, "fog": "#2B3760", "phase": "夜晚" }
+    ]
+  },
+
+  "scatter": {
+    "_说明": "程序化散布数量。区域避让（路面/院子/池塘/栈桥）是自动的。想加密就调大数字。",
+    "trees": 265,
+    "bushes": 340,
+    "rocks": 46,
+    "flowers": 260,
+    "stumps": 48,
+    "grassTufts": 900,
+    "treeMinDistance": 4.2,
+    "rockMinDistance": 3.2,
+    "minTreeHeight": 2.3,
+    "maxTreeHeight": 5.6
+  },
+
+  "ponds": [
+    { "x": -22, "z": -4, "r": 9.0, "depth": 1.5 },
+    { "x": 21, "z": 34, "r": 7.0, "depth": 1.25 }
+  ],
+
+  "paths": [
+    { "width": 2.4, "points": [[-50, 33], [-34, 24], [-20, 12], [-10, 2], [-3, -12], [-1, -30], [0, -44]] },
+    { "width": 2.1, "points": [[-10, 2], [-2, 12], [9, 19], [21, 21]] },
+    { "width": 2.1, "points": [[-3, -12], [10, -16], [22, -18], [33, -15]] },
+    { "width": 1.9, "points": [[9, 19], [14, 27], [16.5, 28.5]] },
+    { "width": 1.9, "points": [[-20, 12], [-26, 20], [-31, 27]] }
+  ],
+
+  "buildings": [
+    { "id": "house-red",    "x": -31, "z": 27, "rot": 0.42,  "w": 9.0, "d": 7.4, "wallH": 3.4, "roofH": 2.6, "roof": 0 },
+    { "id": "house-yellow", "x": 21,  "z": 21, "rot": -0.28, "w": 8.4, "d": 7.0, "wallH": 3.2, "roofH": 2.5, "roof": 1 },
+    { "id": "house-teal",   "x": 33,  "z": -15, "rot": 0.95, "w": 8.8, "d": 7.2, "wallH": 3.3, "roofH": 2.6, "roof": 2 },
+    { "id": "house-green",  "x": -12, "z": -24, "rot": -0.65, "w": 9.2, "d": 7.6, "wallH": 3.5, "roofH": 2.7, "roof": 3 }
+  ],
+
+  "lighthouse": { "x": 0, "z": -47, "height": 15.5, "rot": 0.0 },
+
+  "dock": { "x": -60, "z": 22, "rot": -0.28, "length": 16.0, "width": 2.6 },
+
+  "cropField": { "x": 6, "z": 42, "w": 15, "d": 9, "rot": 0.18, "rows": 6 },
+
+  "props": {
+    "_说明": "小景与生活道具。位置都是初稿，随便挪。",
+    "well":      [{ "x": -16, "z": 9,  "rot": 0.3 }],
+    "millstone": [{ "x": -25, "z": 17, "rot": 0.0 }],
+    "haystacks": [{ "x": -12, "z": 37 }, { "x": -6, "z": 40 }, { "x": 15, "z": 52 }],
+    "pumpkins":  [{ "x": -26, "z": 34 }, { "x": -22, "z": 37 }, { "x": -29, "z": 38 }],
+    "barrels":   [{ "x": -33, "z": 21 }, { "x": -29, "z": 20 }, { "x": 18, "z": 24 }, { "x": 24, "z": 25 }, { "x": 30, "z": -11 }],
+    "benches":   [{ "x": -6, "z": 6, "rot": 1.6 }, { "x": 16, "z": 26, "rot": -0.6 }],
+    "lamps":     [{ "x": -10, "z": 2, "rot": 0 }, { "x": 9, "z": 19, "rot": 0 }, { "x": -3, "z": -12, "rot": 0 }, { "x": -1, "z": -30, "rot": 0 }, { "x": 21, "z": 21, "rot": 0 }],
+    "clotheslines": [{ "x": 26, "z": 15, "rot": -0.4 }],
+    "mailboxes": [{ "x": -36, "z": 24, "rot": 0.5 }, { "x": 16, "z": 18, "rot": -0.4 }],
+    "lilyPads":  [{ "pond": 0 }, { "pond": 1 }]
+  },
+
+  "time": {
+    "_说明": "dayLengthSec = 一整天（24 小时）走完需要多少真实秒。startHour 是出生时间。",
+    "dayLengthSec": 300,
+    "startHour": 9.5,
+    "speeds": [0, 1, 4, 12]
+  },
+
+  "camera": {
+    "fov": 52,
+    "distance": 13.5,
+    "minDistance": 5,
+    "maxDistance": 30,
+    "pitchDeg": 40,
+    "minPitchDeg": 12,
+    "maxPitchDeg": 74,
+    "followLerp": 9.0,
+    "mouseSensitivity": 0.0028
+  },
+
+  "player": {
+    "walkSpeed": 4.4,
+    "runSpeed": 7.6,
+    "turnLerp": 12.0,
+    "height": 1.62,
+    "spawn": { "x": -44, "z": 30 },
+    "waterDepthLimit": 0.55
+  },
+
+  "gallery": {
+    "_说明": "资产总览展台（按 V 切到「资产总览」视角）。放在地图外，不影响主场景。",
+    "x": 0,
+    "z": 620
+  }
+}

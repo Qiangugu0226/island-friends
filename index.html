@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小岛朋友 Island Friends — P1 能走路的小岛</title>
+    <style>
+      :root {
+        --ui-cream: #fdf5e4;
+        --ui-cream-2: #f6e8cd;
+        --ui-ink: #4a4033;
+        --ui-ink-soft: #7d6f5c;
+        --ui-accent: #e8623c;
+        --ui-teal: #2aa6c4;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #f6dfae;
+        font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, sans-serif;
+        color: var(--ui-ink);
+      }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; width: 100%; height: 100%; }
+
+      .hud { position: fixed; z-index: 10; pointer-events: none; }
+
+      .card {
+        background: rgba(253, 245, 228, 0.92);
+        border: 1.5px solid rgba(122, 100, 70, 0.28);
+        border-radius: 14px;
+        box-shadow: 0 6px 18px rgba(90, 70, 40, 0.16);
+        padding: 10px 13px;
+        backdrop-filter: blur(3px);
+      }
+
+      #panel-top-left { top: 14px; left: 14px; min-width: 178px; }
+      #panel-top-right { top: 14px; right: 14px; min-width: 168px; }
+      #panel-controls { bottom: 14px; left: 14px; max-width: 460px; }
+      #panel-views { bottom: 14px; right: 14px; }
+
+      .title { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+      .sub { font-size: 11px; color: var(--ui-ink-soft); margin-top: 2px; }
+      .row { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; line-height: 1.75; }
+      .row b { font-weight: 700; font-variant-numeric: tabular-nums; }
+      .clock { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+      .keys { font-size: 11.5px; line-height: 1.85; color: var(--ui-ink-soft); }
+      .keys kbd {
+        display: inline-block;
+        min-width: 17px;
+        padding: 1px 5px;
+        margin-right: 3px;
+        border-radius: 5px;
+        border: 1px solid rgba(122, 100, 70, 0.35);
+        border-bottom-width: 2px;
+        background: #fffdf7;
+        color: var(--ui-ink);
+        font-family: inherit;
+        font-size: 10.5px;
+        font-weight: 700;
+        text-align: center;
+      }
+      .tag {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 999px;
+        font-size: 10.5px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--ui-teal);
+      }
+      .tag.dusk { background: #e08b3c; }
+      .tag.night { background: #4b5b93; }
+
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: linear-gradient(180deg, #f9ebcb 0%, #f6d79c 60%, #5fd0de 100%);
+        transition: opacity 0.6s ease;
+      }
+      #loading.hidden { opacity: 0; pointer-events: none; }
+      #loading .logo { font-size: 30px; font-weight: 800; letter-spacing: 0.06em; color: #fff; text-shadow: 0 3px 0 rgba(200, 120, 60, 0.45); }
+      #loading .step { font-size: 13px; color: #6b5a41; }
+      #loading .bar { width: 240px; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.65); overflow: hidden; }
+      #loading .bar > i { display: block; height: 100%; width: 0%; background: var(--ui-accent); transition: width 0.25s ease; }
+
+      #hint {
+        position: fixed;
+        z-index: 12;
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%);
+        font-size: 12px;
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: rgba(74, 64, 51, 0.72);
+        color: #fdf5e4;
+        transition: opacity 0.5s ease;
+      }
+      #hint.hidden { opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div class="hud" id="panel-top-left">
+      <div class="card">
+        <div class="title">小岛朋友 · P1</div>
+        <div class="sub">能走路的小岛 · Walking Skeleton</div>
+        <div class="clock" id="clock">09:30</div>
+        <div class="row"><span>时段</span><span class="tag" id="phase">白天</span></div>
+        <div class="row"><span>时间速度</span><b id="timespeed">1x（T 暂停 / [ ] 调整）</b></div>
+      </div>
+    </div>
+
+    <div class="hud" id="panel-top-right">
+      <div class="card">
+        <div class="row"><span>FPS</span><b id="fps">–</b></div>
+        <div class="row"><span>坐标</span><b id="coord">–</b></div>
+        <div class="row"><span>视角</span><b id="view-name">跟随</b></div>
+        <div class="row"><span>场景对象</span><b id="objects">–</b></div>
+      </div>
+    </div>
+
+    <div class="hud" id="panel-controls">
+      <div class="card">
+        <div class="keys">
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 ·
+          <kbd>Shift</kbd> 跑 ·
+          鼠标 转视角（点击画面锁定）·
+          滚轮 缩放
+        </div>
+        <div class="keys">
+          <kbd>V</kbd> 切换视角（跟随 / 全岛俯瞰 / 地面 / 资产总览）·
+          <kbd>T</kbd> 暂停时间 ·
+          <kbd>[</kbd><kbd>]</kbd> 时间速度 ·
+          <kbd>Esc</kbd> 释放鼠标
+        </div>
+      </div>
+    </div>
+
+    <div class="hud" id="panel-views">
+      <div class="card">
+        <div class="title" id="view-hint">纯程序化生成 · 无外部美术资源</div>
+        <div class="sub" id="view-sub">P1 交付：地形 / 沙滩 / 海水与浪花 / 房子 / 灯塔 / 栈桥 / 树草石花 / 玩家 / 昼夜</div>
+      </div>
+    </div>
+
+    <div id="hint">点击画面开始 · WASD 移动</div>
+
+    <div id="loading">
+      <div class="logo">小岛朋友</div>
+      <div class="step" id="loading-step">正在准备小岛…</div>
+      <div class="bar"><i id="loading-bar"></i></div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
