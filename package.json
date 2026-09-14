@@ -3,11 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "小岛朋友 Island Friends — 低多边形乡村小岛探索游戏（P1：能走路的小岛）",
+  "description": "小岛朋友 Island Friends — 低多边形东南沿海渔村小岛探索游戏",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:single": "vite build --config vite.config.single.js && node tools/build-single.mjs",
+    "test:input": "node tools/test-input.mjs",
+    "test:single": "node tools/test-single.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"

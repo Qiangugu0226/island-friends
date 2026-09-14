@@ -111,4 +111,11 @@
 
 **验收结果**：待你验收
 
+**追加 · 单文件离线打包（2026-09-14）**
+- 问题：开发服务器（`npm run dev`）随终端窗口关闭就没了，导致"网址又打不开"
+- 方案：`npm run build:single` → 生成 **`小岛朋友.html`（单文件，约 0.6MB）**，**双击即玩、不需要服务器、不需要网址**（`file://` 直接运行，已用 `tools/test-single.mjs` 验证通过）
+- 新增 `vite.config.single.js`（IIFE + 全内联）、`tools/build-single.mjs`、`tools/test-single.mjs`、`npm run test:input`
+- 注意坑：内联时必须用「函数替换」，否则 JS 代码里的 `$&` / `$'` 会被 `String.replace` 当成替换模式，代码被改坏（已记录在脚本注释里）
+- 日常两条路：**看最新改动** → 双击 `启动游戏.cmd`（带热更新）；**随时玩 / 给别人看** → 双击 `小岛朋友.html`
+
 

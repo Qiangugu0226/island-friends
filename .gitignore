@@ -1,8 +1,13 @@
 # 依赖与构建产物
 node_modules/
 dist/
+dist-single/
 .vite/
 *.local
+
+# 单文件离线版（一键 npm run build:single 即可重新生成，不入库）
+小岛朋友.html
+island-friends.html
 
 # 日志与临时文件
 *.log
