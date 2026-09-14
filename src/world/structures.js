@@ -66,6 +66,8 @@ export function buildStructures(scene, layout, assets, palette) {
   // ---------- 石厝小院 ----------
   layout.pads.forEach((pad) => {
     const house = assets.makeStoneHouse(rand, pad);
+    house.name = `石厝:${pad.id}`;
+    house.userData.audit = { kind: 'compound', tag: pad.id };
     house.position.set(pad.x, pad.y, pad.z);
     group.add(house);
     blockers.push({
@@ -97,6 +99,8 @@ export function buildStructures(scene, layout, assets, palette) {
       }
     }
     const yard = assets.makeStoneWallYard(fw, fd, { gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }] });
+    yard.name = `院墙:${pad.id}`;
+    yard.userData.audit = { kind: 'decor' };
     yard.position.set(pad.x, layout.heightAt(pad.x, pad.z), pad.z);
     yard.rotation.y = pad.rot ?? 0;
     group.add(yard);
@@ -108,6 +112,8 @@ export function buildStructures(scene, layout, assets, palette) {
     const bt = cfg.beaconTower;
     const pad = layout.landmarkPads.find((p) => p.kind === 'beacon');
     const tower = assets.makeBeaconTower(bt);
+    tower.group.name = '航标塔';
+    tower.group.userData.audit = { kind: 'landmark' };
     const y = pad ? pad.y : layout.heightAt(bt.x, bt.z);
     tower.group.position.set(bt.x, y, bt.z);
     tower.group.rotation.y = bt.rot ?? 0;
@@ -116,6 +122,8 @@ export function buildStructures(scene, layout, assets, palette) {
     blockers.push({ x: bt.x, z: bt.z, r: 3.4, h: y + (bt.height ?? 14) + 2 });
 
     const rail = assets.makeStoneWallYard(15, 15, { height: 0.8, gaps: [{ x: 0, z: 7.5, r: 2.4 }] });
+    rail.name = '塔院围墙';
+    rail.userData.audit = { kind: 'decor' };
     rail.position.set(bt.x, y, bt.z);
     group.add(rail);
   }
@@ -126,6 +134,8 @@ export function buildStructures(scene, layout, assets, palette) {
     const pad = layout.landmarkPads.find((p) => p.kind === 'shrine');
     const y = pad ? pad.y : layout.heightAt(sh.x, sh.z);
     const shrine = assets.makeShrine();
+    shrine.group.name = '土地庙';
+    shrine.group.userData.audit = { kind: 'landmark' };
     shrine.group.position.set(sh.x, y, sh.z);
     shrine.group.rotation.y = sh.rot ?? 0;
     group.add(shrine.group);
@@ -137,6 +147,8 @@ export function buildStructures(scene, layout, assets, palette) {
       const bz = sh.z + dz;
       const by = layout.heightAt(bx, bz);
       const banyan = assets.makeBanyan(rand);
+      banyan.name = '庙前榕树';
+      banyan.userData.audit = { kind: 'tree' };
       banyan.position.set(bx, by, bz);
       group.add(banyan);
       blockers.push({ x: bx, z: bz, r: 1.1, h: by + 2.2 });
@@ -166,6 +178,8 @@ export function buildStructures(scene, layout, assets, palette) {
     const pz = dz * (r0 - 1.2);
     const py = Math.max(layout.heightAt(px, pz), 0.7);
     const pier = assets.makeStonePier(cfg.dock);
+    pier.name = '石阶码头';
+    pier.userData.audit = { kind: 'landmark', tag: 'pier' };
     pier.rotation.y = Math.atan2(-dx, -dz);
     pier.position.set(px, py, pz);
     group.add(pier);
@@ -177,6 +191,8 @@ export function buildStructures(scene, layout, assets, palette) {
     const bx = px + mlx * Math.cos(th) + mlz * Math.sin(th);
     const bz = pz - mlx * Math.sin(th) + mlz * Math.cos(th);
     const boat = assets.makeFishingBoat(rand);
+    boat.name = '渔船';
+    boat.userData.audit = { kind: 'landmark', tag: 'pier' };
     boat.position.set(bx, 0.16, bz);
     boat.rotation.y = th + Math.PI / 2;
     group.add(boat);
@@ -185,6 +201,8 @@ export function buildStructures(scene, layout, assets, palette) {
   // ---------- 梯田菜畦 ----------
   if (cfg.cropField) {
     const field = assets.makeTerraceField(rand, cfg.cropField);
+    field.name = '梯田菜畦';
+    field.userData.audit = { kind: 'landmark' };
     const pad = layout.landmarkPads.find((p) => p.kind === 'crop');
     field.position.set(
       cfg.cropField.x,
@@ -195,8 +213,12 @@ export function buildStructures(scene, layout, assets, palette) {
   }
 
   // ---------- 渔家小景 ----------
-  // 摆位规则：道具不许压在石板路 / 池塘 / 地标（航标塔、土地庙、梯田）上，
-  // 如果原坐标落在这些地方，就自动往旁边找一块空地（这是"穿模"的通用解法）。
+  // 摆位规则（穿模的通用解法）：
+  //   1) 不压石板路  2) 不压池塘  3) 不压地标（航标塔/土地庙/梯田）
+  //   4) 不与任何已有物件重叠（房子、地标、先前摆下的道具都会被"占位"）
+  // 落在禁区里就自动往旁边找一块空地。
+  const occupied = blockers.map((b) => ({ x: b.x, z: b.z, r: b.r, name: b.name }));
+
   const inRoad = (x, z, margin) => {
     for (const path of layout.paths) {
       for (const s of path.segs) {
@@ -215,28 +237,42 @@ export function buildStructures(scene, layout, assets, palette) {
   const onLandmark = (x, z, margin) =>
     layout.landmarkPads.some((p) => (x - p.x) ** 2 + (z - p.z) ** 2 < (p.padR * 0.5 + margin) ** 2);
 
-  function findPlacement(x, z, margin, radius) {
-    const busy = (px, pz) => inRoad(px, pz, margin) || inPond(px, pz, margin + 0.4) || onLandmark(px, pz, margin);
-    if (!busy(x, z)) return { x, z, moved: false };
-    for (const r of [radius + 0.6, radius + 1.4, radius + 2.4, radius + 3.6]) {
-      for (let k = 0; k < 10; k++) {
-        const a = (k / 10) * Math.PI * 2 + r;
+  function busy(px, pz, myR) {
+    if (inRoad(px, pz, Math.max(0.9, myR * 0.6))) return true;
+    if (inPond(px, pz, myR * 0.5 + 0.5)) return true;
+    if (onLandmark(px, pz, myR)) return true;
+    for (const o of occupied) {
+      if ((px - o.x) ** 2 + (pz - o.z) ** 2 < (o.r + myR + 0.6) ** 2) return true;
+    }
+    return false;
+  }
+
+  function findPlacement(x, z, radius) {
+    if (!busy(x, z, radius)) return { x, z, moved: false };
+    for (const r of [radius + 0.9, radius + 1.8, radius + 2.8, radius + 4.0, radius + 5.4, radius + 7.0, radius + 9.0, radius + 11.5]) {
+      for (let k = 0; k < 14; k++) {
+        const a = (k / 14) * Math.PI * 2 + r;
         const px = x + Math.cos(a) * r;
         const pz = z + Math.sin(a) * r;
-        if (!busy(px, pz)) return { x: px, z: pz, moved: true };
+        if (!busy(px, pz, radius)) return { x: px, z: pz, moved: true };
       }
     }
-    return { x, z, moved: false };
+    return { x, z, moved: false, failed: true };
   }
 
   const place = (builder, list, opts = {}) => {
+    const myR = opts.radius ?? 1.0;
     for (const item of list ?? []) {
-      const spot = findPlacement(item.x, item.z, opts.clearance ?? 0.7, opts.radius ?? 1.2);
+      const spot = findPlacement(item.x, item.z, myR);
       const obj = builder();
+      const target = obj.group ?? obj;
+      if (opts.name) target.name = opts.name;
+      target.userData.audit = { kind: opts.kind ?? 'prop' };
       const x = spot.x;
       const z = spot.z;
-      const y = layout.heightAt(x, z) - (opts.sink ?? 0.1);
       if (spot.moved) stats.nudged = (stats.nudged ?? 0) + 1;
+      if (spot.failed) stats.placementFailed = (stats.placementFailed ?? 0) + 1;
+      const y = layout.heightAt(x, z) - (opts.sink ?? 0.1);
       if (obj.group) {
         obj.group.position.set(x, y, z);
         obj.group.rotation.y = item.rot ?? 0;
@@ -247,36 +283,41 @@ export function buildStructures(scene, layout, assets, palette) {
         obj.rotation.y = item.rot ?? 0;
         group.add(obj);
       }
+      occupied.push({ x, z, r: myR, name: opts.name });
       if (opts.blockerRadius) blockers.push({ x, z, r: opts.blockerRadius, h: y + (opts.blockerHeight ?? 2.2) });
       stats.props++;
     }
   };
 
   const P = cfg.props ?? {};
-  place(assets.makeWell, P.well, { blockerRadius: 1.5, blockerHeight: 3.4, radius: 1.6 });
-  place(assets.makeMillstone, P.millstone, { blockerRadius: 1.2, radius: 1.2 });
-  place(() => assets.makeHaystack(rand), P.haystacks, { blockerRadius: 1.3, radius: 1.3 });
-  place(() => assets.makePumpkin(rand), P.pumpkins, { sink: 0.04 });
-  place(assets.makeBarrel, P.barrels, { blockerRadius: 0.55, radius: 0.7 });
-  place(assets.makeStoneBench, P.benches, { blockerRadius: 1.0, radius: 1.1 });
-  place(assets.makeLanternPost, P.lanternPosts, { blockerRadius: 0.3, blockerHeight: 3.4, radius: 0.8 });
-  place(assets.makeClothesline, P.clotheslines, { radius: 2.3 });
-  place(assets.makeMailbox, P.mailboxes, { blockerRadius: 0.35, radius: 0.6 });
-  place(assets.makeNetRack, P.netRacks, { blockerRadius: 1.6, blockerHeight: 2.6, radius: 2.1 });
-  place(() => assets.makeDryingRack(rand), P.dryingRacks, { blockerRadius: 1.1, radius: 1.6 });
-  place(assets.makeWaterJar, P.waterJars, { blockerRadius: 0.55, radius: 0.8 });
-  place(() => assets.makeBasket(rand), P.baskets, { blockerRadius: 0.4, radius: 0.7 });
+  place(assets.makeWell, P.well, { name: '水井', blockerRadius: 1.5, blockerHeight: 3.4, radius: 1.6 });
+  place(assets.makeMillstone, P.millstone, { name: '石磨', blockerRadius: 1.2, radius: 1.2 });
+  place(() => assets.makeHaystack(rand), P.haystacks, { name: '稻草堆', blockerRadius: 1.3, radius: 1.3 });
+  place(() => assets.makePumpkin(rand), P.pumpkins, { name: '南瓜', sink: 0.04 });
+  place(assets.makeBarrel, P.barrels, { name: '木桶', blockerRadius: 0.55, radius: 0.7 });
+  place(assets.makeStoneBench, P.benches, { name: '石凳', blockerRadius: 1.0, radius: 1.1 });
+  place(assets.makeLanternPost, P.lanternPosts, { name: '灯笼路灯', blockerRadius: 0.3, blockerHeight: 3.4, radius: 0.8 });
+  place(assets.makeClothesline, P.clotheslines, { name: '晾衣绳', radius: 2.3 });
+  place(assets.makeMailbox, P.mailboxes, { name: '信箱', blockerRadius: 0.35, radius: 0.6 });
+  place(assets.makeNetRack, P.netRacks, { name: '晒渔网架', blockerRadius: 1.6, blockerHeight: 2.6, radius: 2.1 });
+  place(() => assets.makeDryingRack(rand), P.dryingRacks, { name: '晒鱼干架', blockerRadius: 1.1, radius: 1.6 });
+  place(assets.makeWaterJar, P.waterJars, { name: '水缸', blockerRadius: 0.55, radius: 0.8 });
+  place(() => assets.makeBasket(rand), P.baskets, { name: '竹篓', blockerRadius: 0.4, radius: 0.7 });
 
-  // 池塘四周点缀石头
+  // 池塘四周点缀石头（同样遵守占位规则，别插进房子里）
   for (const pond of layout.ponds) {
     for (let i = 0; i < 7; i++) {
       const a = (i / 7) * Math.PI * 2 + rand() * 0.5;
       const rr = pond.r * (0.92 + rand() * 0.3);
       const x = pond.x + Math.cos(a) * rr;
       const z = pond.z + Math.sin(a) * rr;
+      if (busy(x, z, 0.7)) continue;
       const rock = assets.makeRock(rand);
+      rock.name = '塘边石头';
+      rock.userData.audit = { kind: 'rock' };
       rock.position.set(x, layout.heightAt(x, z) - 0.12, z);
       group.add(rock);
+      occupied.push({ x, z, r: 0.7, name: '塘边石头' });
     }
   }
 

@@ -13,6 +13,7 @@ import { createTime } from './core/time.js';
 import { createInput } from './core/input.js';
 import { createCameraRig } from './core/camera.js';
 import { createHud } from './ui/hud.js';
+import { createAudit } from './dev/audit.js';
 import { clamp } from './core/rng.js';
 
 const params = new URLSearchParams(location.search);
@@ -333,6 +334,7 @@ async function boot() {
       return { forward: b.forward.toArray(), right: b.right.toArray() };
     },
     info: () => renderer.info,
+    audit: () => createAudit({ structures, layout, cfg })(),
     ready: true
   };
 

@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "build:single": "vite build --config vite.config.single.js && node tools/build-single.mjs",
+    "audit": "node tools/audit.mjs",
     "test:input": "node tools/test-input.mjs",
     "test:single": "node tools/test-single.mjs"
   },

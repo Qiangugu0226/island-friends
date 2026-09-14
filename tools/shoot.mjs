@@ -24,7 +24,7 @@ const widthArg = args.indexOf('--w');
 const heightArg = args.indexOf('--h');
 const width = widthArg >= 0 ? Number(args[widthArg + 1]) : 1600;
 const height = heightArg >= 0 ? Number(args[heightArg + 1]) : 900;
-const port = process.env.SHOOT_PORT ?? '5174';
+const port = process.env.SHOOT_PORT ?? '5173';
 const url = `http://127.0.0.1:${port}/${query ? `?${query}` : ''}`;
 
 const browserPath = EDGE_CANDIDATES.find((p) => existsSync(p));
