@@ -49,6 +49,8 @@ async function boot() {
 
   const input = createInput(renderer.domElement);
   const rig = createCameraRig(camera, cfg.camera, input);
+  // ?dist=5 可以把跟随相机拉近（给玩家/动物拍特写用）
+  if (params.has('dist')) rig.state.distance = parseFloat(params.get('dist'));
   const time = createTime(cfg.time);
   if (params.has('hour')) time.setHour(parseFloat(params.get('hour')));
 
@@ -325,6 +327,11 @@ async function boot() {
     setHour: (h) => time.setHour(h),
     setView: (v) => rig.setMode(v),
     teleport: (x, z) => player.teleport(x, z),
+    pos: () => player.position.toArray(),
+    basis: () => {
+      const b = rig.basis();
+      return { forward: b.forward.toArray(), right: b.right.toArray() };
+    },
     info: () => renderer.info,
     ready: true
   };

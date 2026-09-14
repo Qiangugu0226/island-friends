@@ -116,9 +116,10 @@ export function createCameraRig(camera, cfg, input) {
     modeName: (m) => modeNames[m] ?? m,
     get mode() { return state.mode; },
     // 相机水平的 前进/右 方向（用于 WASD 移动）
+    // 右手系：right = cross(forward, up) = (-forward.z, 0, forward.x)
     basis() {
       forward.set(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
-      right.set(forward.z, 0, -forward.x);
+      right.set(-forward.z, 0, forward.x);
       return { forward, right };
     }
   };

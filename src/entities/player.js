@@ -65,11 +65,13 @@ export function createPlayer(assets, palette, cfg, layout) {
   makeLimb('armL', -0.3, 1.28, skin, 0.56, 0.14);
   makeLimb('armR', 0.3, 1.28, skin, 0.56, 0.14);
 
-  // 小鞋子
-  for (const x of [-0.13, 0.13]) {
-    const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.28), mat('#7A5236'));
-    shoe.position.set(x, 0.06, 0.04);
-    body.add(shoe);
+  // 小鞋子：挂在腿的关节下面，这样腿摆鞋子跟着摆
+  const shoeGeo = new THREE.BoxGeometry(0.2, 0.12, 0.3);
+  const shoeMat = mat('#7A5236');
+  for (const [name, zOff] of [['legL', 0.04], ['legR', 0.04]]) {
+    const shoe = new THREE.Mesh(shoeGeo, shoeMat);
+    shoe.position.set(0, -0.72, zOff);
+    limbs[name].add(shoe);
   }
 
   body.traverse((o) => {
@@ -189,18 +191,21 @@ export function createPlayer(assets, palette, cfg, layout) {
       state.animPhase += dt * 1.4;
     }
     const swing = state.speed > 0.05 ? clamp(state.speed / (running ? cfg.runSpeed : cfg.walkSpeed), 0, 1.2) : 0;
-    const s = Math.sin(state.animPhase * 2) * 0.62 * swing;
-    const s2 = Math.sin(state.animPhase * 2 + Math.PI) * 0.62 * swing;
+    // 跑步时腿摆更大、身体略前倾、上下起伏更明显
+    const legAmp = running ? 0.86 : 0.6;
+    const s = Math.sin(state.animPhase * 2) * legAmp * swing;
+    const s2 = Math.sin(state.animPhase * 2 + Math.PI) * legAmp * swing;
     limbs.legL.rotation.x = s;
     limbs.legR.rotation.x = s2;
-    limbs.armL.rotation.x = -s * 0.75;
-    limbs.armR.rotation.x = -s2 * 0.75;
-    limbs.armL.rotation.z = 0.06;
-    limbs.armR.rotation.z = -0.06;
-    const bob = Math.abs(Math.sin(state.animPhase * 2)) * 0.045 * swing;
+    limbs.armL.rotation.x = -s * (running ? 0.95 : 0.75);
+    limbs.armR.rotation.x = -s2 * (running ? 0.95 : 0.75);
+    limbs.armL.rotation.z = 0.06 + (running ? 0.08 : 0);
+    limbs.armR.rotation.z = -0.06 - (running ? 0.08 : 0);
+    const bob = Math.abs(Math.sin(state.animPhase * 2)) * (running ? 0.075 : 0.045) * swing;
     const idle = state.speed < 0.05 ? Math.sin(state.animPhase) * 0.012 : 0;
     body.position.y = bob + idle;
     body.rotation.z = Math.sin(state.animPhase * 2) * 0.02 * swing;
+    body.rotation.x = running ? -0.12 * swing : 0;
   }
 
   return {

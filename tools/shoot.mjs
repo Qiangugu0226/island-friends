@@ -75,6 +75,17 @@ try {
 
 // 让渲染循环跑几帧（时间推进、阴影稳定）
 await delay(1500);
+
+// 可选：截图前按住某些键（用于拍走路/跑步姿态）  --keys KeyW,ShiftLeft --hold 900
+const keysArg = args.indexOf('--keys');
+if (keysArg >= 0) {
+  const keys = args[keysArg + 1].split(',').filter(Boolean);
+  const holdArg = args.indexOf('--hold');
+  const hold = holdArg >= 0 ? Number(args[holdArg + 1]) : 800;
+  for (const k of keys) await page.keyboard.down(k);
+  await delay(hold);
+}
+
 await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
 const outPath = `shots/${name}.png`;

@@ -94,9 +94,9 @@ export function createAssets(palette) {
     ridge.position.y = h + 0.07;
     g.add(ridge);
 
-    // 两端燕尾翘角：从正脊端点接出去，两段叠出上扬的曲线
-    const tipLen1 = Math.min(0.95, w * 0.13) + 0.34;
-    const tipLen2 = Math.min(0.5, w * 0.07) + 0.2;
+    // 两端燕尾翘角：长度跟着屋宽走，小房子（土地庙）也不会变成两根长红杆
+    const tipLen1 = 0.3 + Math.min(0.75, w * 0.085);
+    const tipLen2 = 0.16 + Math.min(0.42, w * 0.05);
     for (const s of [-1, 1]) {
       const tip1 = new THREE.Mesh(new THREE.BoxGeometry(tipLen1, 0.22, 0.26), mat(ridgeColor));
       tip1.position.set(s * (hw + tipLen1 * 0.4), h + 0.14, 0);
@@ -382,40 +382,64 @@ export function createAssets(palette) {
   }
 
   // ---------- 石阶码头 ----------
+  // 原点在岸上（水线附近），-Z 朝离岛方向。
+  // 结构：岸上 3 级台阶 → 石砌栈台（顶面 y=1.15）→ 栈台末端 4 级台阶下到水里。
   function makeStonePier(cfg) {
     const g = new THREE.Group();
     const L = cfg.length ?? 14;
     const W = cfg.width ?? 3.0;
-    const steps = 6;
+    const DECK_TOP = 1.15;
+    const stepD = 0.7;
 
-    for (let i = 0; i < steps; i++) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(W, 0.3, 0.8), mat(i % 2 === 0 ? palette.stone : palette.stoneDark));
-      step.position.set(0, 1.1 - i * 0.3, -i * 0.8);
+    // 岸上台阶（从沙滩上到栈台）
+    for (let i = 0; i < 3; i++) {
+      const y = 0.3 + i * 0.3;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(W - 0.2, 0.3, stepD + 0.15), mat(i % 2 === 0 ? palette.stone : palette.stoneDark));
+      step.position.set(0, y - 0.15, 1.5 - i * stepD);
       g.add(step);
     }
 
-    const pierLen = L - steps * 0.8;
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, pierLen), mat(palette.stone));
-    deck.position.set(0, 1.0, -steps * 0.8 - pierLen / 2);
+    const deckStart = 1.5 - 2 * stepD - stepD * 0.5;
+    const outerSteps = 4;
+    const deckEnd = -L + outerSteps * stepD + 1.0;
+    const pierLen = Math.max(4, deckStart - deckEnd - 0.6);
+    const deckCenterZ = deckStart - pierLen / 2;
+
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(W, DECK_TOP - 0.35, pierLen), mat(palette.stone));
+    deck.position.set(0, (DECK_TOP - 0.35) / 2 + 0.1, deckCenterZ);
     g.add(deck);
-    const deckTop = new THREE.Mesh(new THREE.BoxGeometry(W + 0.2, 0.1, pierLen), mat(palette.stoneDark));
-    deckTop.position.set(0, 1.22, deck.position.z);
+    const deckTop = new THREE.Mesh(new THREE.BoxGeometry(W + 0.24, 0.12, pierLen + 0.1), mat(palette.stoneDark));
+    deckTop.position.set(0, DECK_TOP + 0.06, deckCenterZ);
     g.add(deckTop);
 
-    for (let i = 0; i < Math.round(pierLen / 2.4); i++) {
-      const z = -steps * 0.8 - 1.2 - i * 2.4;
+    // 石砌墩
+    for (let i = 0; i < Math.round(pierLen / 2.2); i++) {
+      const z = deckStart - 1.2 - i * 2.2;
       for (const x of [-W / 2 + 0.35, W / 2 - 0.35]) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.2, 0.5), mat(palette.stoneDark));
-        post.position.set(x, 0.0, z);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.6, 0.5), mat(palette.stoneDark));
+        post.position.set(x, -0.3, z);
         g.add(post);
       }
     }
 
+    // 末端下水的台阶
+    for (let i = 0; i < outerSteps; i++) {
+      const y = DECK_TOP - 0.35 - i * 0.32;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(W - 0.3, 0.32, stepD), mat(i % 2 === 0 ? palette.stoneDark : palette.stone));
+      step.position.set(0, y - 0.16, deckEnd - 0.2 - i * stepD);
+      g.add(step);
+    }
+
+    // 系缆桩（栈台末端两侧）
     for (const x of [W / 2 - 0.3, -W / 2 + 0.3]) {
       const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.75, 6), mat(palette.stoneDark));
-      bollard.position.set(x, 1.55, -steps * 0.8 - 1.6);
+      bollard.position.set(x, DECK_TOP + 0.45, deckEnd + 0.9);
       g.add(bollard);
     }
+
+    // 给外面用：栈台顶面高度、靠船位置（本地坐标）
+    g.userData.deckTopY = DECK_TOP;
+    g.userData.moorLocal = [W / 2 + 1.55, DECK_TOP - 0.95, deckCenterZ - pierLen * 0.22];
     return shade(g);
   }
 

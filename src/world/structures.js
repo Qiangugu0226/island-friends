@@ -171,11 +171,14 @@ export function buildStructures(scene, layout, assets, palette) {
     group.add(pier);
     stats.props++;
 
-    const bow = new THREE.Vector3(px, py, pz).addScaledVector(new THREE.Vector3(dx, 0, dz), cfg.dock.length - 2.4);
-    bow.y = 0.22;
+    // 渔船停在栈台侧边，浮在水面上（y 固定在水线附近，不跟着栈台抬高）
+    const [mlx, , mlz] = pier.userData.moorLocal ?? [2.6, 0.2, -6];
+    const th = pier.rotation.y;
+    const bx = px + mlx * Math.cos(th) + mlz * Math.sin(th);
+    const bz = pz - mlx * Math.sin(th) + mlz * Math.cos(th);
     const boat = assets.makeFishingBoat(rand);
-    boat.position.copy(bow);
-    boat.rotation.y = Math.atan2(-dx, -dz) + Math.PI / 2 + 0.1;
+    boat.position.set(bx, 0.16, bz);
+    boat.rotation.y = th + Math.PI / 2;
     group.add(boat);
   }
 
@@ -192,12 +195,48 @@ export function buildStructures(scene, layout, assets, palette) {
   }
 
   // ---------- 渔家小景 ----------
+  // 摆位规则：道具不许压在石板路 / 池塘 / 地标（航标塔、土地庙、梯田）上，
+  // 如果原坐标落在这些地方，就自动往旁边找一块空地（这是"穿模"的通用解法）。
+  const inRoad = (x, z, margin) => {
+    for (const path of layout.paths) {
+      for (const s of path.segs) {
+        let t = 0;
+        if (s.len2 > 1e-6) t = Math.max(0, Math.min(1, ((x - s.a.x) * s.dx + (z - s.a.z) * s.dz) / s.len2));
+        const px = s.a.x + s.dx * t;
+        const pz = s.a.z + s.dz * t;
+        const rr = path.half + margin;
+        if ((x - px) ** 2 + (z - pz) ** 2 < rr * rr) return true;
+      }
+    }
+    return false;
+  };
+  const inPond = (x, z, margin) =>
+    layout.ponds.some((p) => (x - p.x) ** 2 + (z - p.z) ** 2 < (p.r + margin) ** 2);
+  const onLandmark = (x, z, margin) =>
+    layout.landmarkPads.some((p) => (x - p.x) ** 2 + (z - p.z) ** 2 < (p.padR * 0.5 + margin) ** 2);
+
+  function findPlacement(x, z, margin, radius) {
+    const busy = (px, pz) => inRoad(px, pz, margin) || inPond(px, pz, margin + 0.4) || onLandmark(px, pz, margin);
+    if (!busy(x, z)) return { x, z, moved: false };
+    for (const r of [radius + 0.6, radius + 1.4, radius + 2.4, radius + 3.6]) {
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * Math.PI * 2 + r;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (!busy(px, pz)) return { x: px, z: pz, moved: true };
+      }
+    }
+    return { x, z, moved: false };
+  }
+
   const place = (builder, list, opts = {}) => {
     for (const item of list ?? []) {
+      const spot = findPlacement(item.x, item.z, opts.clearance ?? 0.7, opts.radius ?? 1.2);
       const obj = builder();
-      const x = item.x;
-      const z = item.z;
+      const x = spot.x;
+      const z = spot.z;
       const y = layout.heightAt(x, z) - (opts.sink ?? 0.1);
+      if (spot.moved) stats.nudged = (stats.nudged ?? 0) + 1;
       if (obj.group) {
         obj.group.position.set(x, y, z);
         obj.group.rotation.y = item.rot ?? 0;
@@ -214,19 +253,19 @@ export function buildStructures(scene, layout, assets, palette) {
   };
 
   const P = cfg.props ?? {};
-  place(assets.makeWell, P.well, { blockerRadius: 1.5, blockerHeight: 3.4 });
-  place(assets.makeMillstone, P.millstone, { blockerRadius: 1.2 });
-  place(() => assets.makeHaystack(rand), P.haystacks, { blockerRadius: 1.3 });
+  place(assets.makeWell, P.well, { blockerRadius: 1.5, blockerHeight: 3.4, radius: 1.6 });
+  place(assets.makeMillstone, P.millstone, { blockerRadius: 1.2, radius: 1.2 });
+  place(() => assets.makeHaystack(rand), P.haystacks, { blockerRadius: 1.3, radius: 1.3 });
   place(() => assets.makePumpkin(rand), P.pumpkins, { sink: 0.04 });
-  place(assets.makeBarrel, P.barrels, { blockerRadius: 0.55 });
-  place(assets.makeStoneBench, P.benches, { blockerRadius: 1.0 });
-  place(assets.makeLanternPost, P.lanternPosts, { blockerRadius: 0.3, blockerHeight: 3.4 });
-  place(assets.makeClothesline, P.clotheslines, {});
-  place(assets.makeMailbox, P.mailboxes, { blockerRadius: 0.35 });
-  place(assets.makeNetRack, P.netRacks, { blockerRadius: 1.6, blockerHeight: 2.6 });
-  place(() => assets.makeDryingRack(rand), P.dryingRacks, { blockerRadius: 1.1 });
-  place(assets.makeWaterJar, P.waterJars, { blockerRadius: 0.55 });
-  place(() => assets.makeBasket(rand), P.baskets, { blockerRadius: 0.4 });
+  place(assets.makeBarrel, P.barrels, { blockerRadius: 0.55, radius: 0.7 });
+  place(assets.makeStoneBench, P.benches, { blockerRadius: 1.0, radius: 1.1 });
+  place(assets.makeLanternPost, P.lanternPosts, { blockerRadius: 0.3, blockerHeight: 3.4, radius: 0.8 });
+  place(assets.makeClothesline, P.clotheslines, { radius: 2.3 });
+  place(assets.makeMailbox, P.mailboxes, { blockerRadius: 0.35, radius: 0.6 });
+  place(assets.makeNetRack, P.netRacks, { blockerRadius: 1.6, blockerHeight: 2.6, radius: 2.1 });
+  place(() => assets.makeDryingRack(rand), P.dryingRacks, { blockerRadius: 1.1, radius: 1.6 });
+  place(assets.makeWaterJar, P.waterJars, { blockerRadius: 0.55, radius: 0.8 });
+  place(() => assets.makeBasket(rand), P.baskets, { blockerRadius: 0.4, radius: 0.7 });
 
   // 池塘四周点缀石头
   for (const pond of layout.ponds) {
