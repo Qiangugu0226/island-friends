@@ -14,6 +14,12 @@ import { createInput } from './core/input.js';
 import { createCameraRig } from './core/camera.js';
 import { createHud } from './ui/hud.js';
 import { createAudit } from './dev/audit.js';
+import { createBubbles } from './systems/bubbles.js';
+import { createClues } from './systems/clues.js';
+import { createAnimal } from './systems/animal-ai.js';
+import { createAffection } from './systems/affection.js';
+import { createAudio } from './systems/audio.js';
+import animalsConfig from './data/animals.json';
 import { clamp } from './core/rng.js';
 
 const params = new URLSearchParams(location.search);
@@ -165,6 +171,55 @@ async function boot() {
     { label: '玩家（你）', make: () => player.buildPreview() }
   ]);
 
+  hud.setLoading('正在把大黄放到岛上…', 0.9);
+  await nextFrame();
+
+  // ---------- P2：动物 / 线索 / 交互系统 ----------
+  const audio = createAudio();
+  const bubbles = createBubbles(scene);
+  const clues = createClues(scene, palette, assets);
+  clues.attachLayout(layout);
+
+  const dwarf = animalsConfig.animals[0];
+  const animal = createAnimal({ scene, assets, palette, layout, cfg: dwarf, audio, bubbleMakers: bubbles });
+  animal.reset();
+
+  const affection = createAffection({
+    scene,
+    layout,
+    assets,
+    palette,
+    cfg: { foods: animalsConfig.foods, animals: animalsConfig.animals },
+    bubbles,
+    audio
+  });
+
+  // URL 调试：?dog=alert|flee|curious|hidden  ?aff=60  ?food=bone:3
+  if (params.has('aff')) {
+    const v = parseFloat(params.get('aff'));
+    affection.state.affection[dwarf.id] = v;
+    affection.state.observed[dwarf.id] = true;
+  }
+  if (params.has('food')) {
+    const [id, n] = params.get('food').split(':');
+    if (affection.state.inventory[id] !== undefined) affection.state.inventory[id] = Number(n ?? 1);
+    affection.autoSelectFood();
+  }
+  if (params.has('dog')) {
+    const mode = params.get('dog');
+    if (mode === 'flee') {
+      animal.state.mode = 'flee';
+      animal.state.fleeTarget = animal.hideouts[(animal.state.hideoutIndex + 1) % animal.hideouts.length];
+    } else if (mode === 'alert') {
+      animal.state.mode = 'alert';
+    } else if (mode === 'curious') {
+      animal.state.mode = 'curious';
+      affection.state.affection[dwarf.id] = Math.max(affection.state.affection[dwarf.id] ?? 0, 20);
+    } else {
+      animal.state.mode = 'hidden';
+    }
+  }
+
   // ---------- 视角 ----------
   const viewInfo = {
     follow: ['纯程序化生成 · 无外部美术资源', 'P1.5 地方化：东南沿海渔村（石厝 / 燕尾脊 / 航标塔 / 土地庙 / 石阶码头 / 渔网）'],
@@ -226,6 +281,8 @@ async function boot() {
   let prev = performance.now();
   let elapsed = 0;
   let lastSpeedIndex = 1;
+  let cardOpen = false;
+  const p2dbg = {};
 
   function frame(now) {
     const dt = Math.min((now - prev) / 1000, 0.06);
@@ -254,6 +311,93 @@ async function boot() {
     }
 
     ocean.update(elapsed, hour, sky.fog.color, sky.fog.near, sky.fog.far);
+
+    // ---------- P2：大黄 / 线索 / 交互 ----------
+    animal.update(dt, elapsed, {
+      playerPos: player.position,
+      posture: player.state.posture,
+      affection: affection.state.affection[dwarf.id] ?? 0
+    });
+    clues.update(dt, elapsed, {
+      position: animal.position,
+      tier: animal.state.tier,
+      facing: animal.state.facing,
+      hidden: animal.isHiding(),
+      visibleToPlayer: animal.model.root.visible
+    });
+    bubbles.update(dt);
+    affection.update(dt, player.position);
+
+    const dogDist = animal.state.distance;
+    const dogVisible = animal.model.root.visible;
+    const observable = dogVisible && dogDist <= dwarf.trust.observeRange && animal.state.mode !== 'flee';
+    const canFeed = dogVisible && dogDist <= 3.4 && animal.state.mode !== 'flee';
+    p2dbg.observable = observable;
+    p2dbg.canFeed = canFeed;
+    p2dbg.dogDist = +dogDist.toFixed(2);
+    p2dbg.dogVisible = dogVisible;
+    p2dbg.dogMode = animal.state.mode;
+    p2dbg.posture = player.state.posture;
+    p2dbg.hasCrosshairEl = !!document.getElementById('crosshair');
+
+    if (input.wasPressed('KeyE')) {
+      if (cardOpen) {
+        cardOpen = false;
+        hud.hideObserveCard();
+      } else if (observable) {
+        cardOpen = true;
+        affection.observe(dwarf.id);
+      }
+    }
+    if (input.wasPressed('KeyF') && canFeed) {
+      const res = affection.feed(dwarf.id);
+      if (res.ok || res.reason === 'wrongFood') animal.onFeed(res.ok);
+    }
+    for (let i = 0; i < 4; i++) {
+      if (input.wasPressed(`Digit${i + 1}`)) affection.selectFood(affection.foods[i].id);
+    }
+    if (cardOpen && !observable && dogDist > dwarf.trust.observeRange + 1.5) {
+      cardOpen = false;
+      hud.hideObserveCard();
+    }
+
+    hud.setCrosshair({ observable, canFeed });
+    hud.updateAffection({
+      visible: !!affection.state.observed[dwarf.id],
+      name: dwarf.name,
+      emoji: '🐶',
+      level: affection.levelOf(dwarf.id),
+      value: affection.state.affection[dwarf.id] ?? 0,
+      max: dwarf.affection.max,
+      tip: (affection.state.affection[dwarf.id] ?? 0) < 20 ? '蹲下（C）慢慢靠近，别吓到它' : (affection.state.affection[dwarf.id] ?? 0) < 60 ? '它不再跑了，可以投喂' : '它开始凑过来摇尾巴了'
+    });
+    hud.updateInventory(affection.inventoryList, affection.state.selected, affection.state.observed[dwarf.id]);
+    hud.updateToasts(affection.state.toasts);
+    if (cardOpen) {
+      hud.updateObserveCard({
+        name: dwarf.name,
+        emoji: '🐶',
+        species: `${dwarf.species} · ${dwarf.personality}`,
+        state: animal.state.mode,
+        stateText: {
+          hidden: '躲藏中',
+          alert: '警觉',
+          flee: '吓跑了',
+          curious: '看着你'
+        }[animal.state.mode] ?? animal.state.mode,
+        body: animal.state.mode === 'hidden'
+          ? '它缩在草丛里，只露出一截尾巴尖，耳朵一动一动。'
+          : animal.state.mode === 'alert'
+            ? '它半撑起身子盯着你，没有跑，尾巴小心翼翼地摇着。'
+            : animal.state.mode === 'flee'
+              ? '它被吓跑了，正往远处的窝跑——走远一点它就会回来。'
+              : '它认得你了，歪着头看你，尾巴摇得很欢。',
+        quote: `「${dwarf.hint}」`,
+        affection: affection.state.affection[dwarf.id] ?? 0,
+        max: dwarf.affection.max,
+        likeFood: affection.foodById[dwarf.likeFood]?.name ?? '-'
+      });
+    }
 
     const lf = lampFactor(hour);
     for (const light of lampLights) {
@@ -335,6 +479,68 @@ async function boot() {
     },
     info: () => renderer.info,
     audit: () => createAudit({ structures, layout, cfg })(),
+    // P2：给自动化测试用的钩子
+    dog: () => ({
+      mode: animal.state.mode,
+      distance: +animal.state.distance.toFixed(2),
+      tier: animal.state.tier,
+      visible: animal.model.root.visible,
+      hideout: animal.state.hideoutIndex,
+      position: animal.position.toArray().map((v) => +v.toFixed(2)),
+      hideouts: animal.hideouts.map((h) => ({ label: h.label, x: +h.x.toFixed(1), z: +h.z.toFixed(1) }))
+    }),
+    affection: () => ({
+      value: affection.state.affection[dwarf.id] ?? 0,
+      level: affection.levelOf(dwarf.id).name,
+      observed: !!affection.state.observed[dwarf.id],
+      inventory: { ...affection.state.inventory },
+      selected: affection.state.selected,
+      cooldown: +affection.state.feedCooldown.toFixed(2)
+    }),
+    posture: () => player.state.posture,
+    feed: () => {
+      const res = affection.feed(dwarf.id);
+      if (res.ok || res.reason === 'wrongFood') animal.onFeed(res.ok);
+      return res;
+    },
+    observe: () => {
+      affection.observe(dwarf.id);
+      return affection.state.observed[dwarf.id];
+    },
+    setAffection: (v) => {
+      affection.state.affection[dwarf.id] = Math.max(0, Math.min(dwarf.affection.max, v));
+      affection.state.observed[dwarf.id] = true;
+    },
+    jumpDog: (i) => animal.jumpToHideout(i),
+    forceDogMode: (m) => {
+      animal.state.mode = m;
+    },
+    uiState: () => ({
+      card: hud.observeCardOpen,
+      affectionVisible: !document.getElementById('affection')?.hidden,
+      crosshairGold: document.getElementById('crosshair')?.classList.contains('gold') ?? false,
+      prompt: document.getElementById('prompt')?.textContent ?? '',
+      ...p2dbg
+    }),
+    giveFood: (id, n = 1) => {
+      if (affection.state.inventory[id] === undefined) return false;
+      affection.state.inventory[id] += n;
+      affection.autoSelectFood();
+      return true;
+    },
+    resetFeedCooldown: () => {
+      affection.state.feedCooldown = 0;
+    },
+    setFreeCam: (pos, look) => {
+      freeCam.pos.set(pos[0], pos[1], pos[2]);
+      freeCam.look.set(look[0], look[1], look[2]);
+      freeCam.active = true;
+      rig.setMode('free');
+    },
+    setFollow: (dist) => {
+      if (dist) rig.state.distance = dist;
+      rig.setMode('follow');
+    },
     ready: true
   };
 

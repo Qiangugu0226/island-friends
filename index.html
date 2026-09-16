@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -107,6 +107,118 @@
         transition: opacity 0.5s ease;
       }
       #hint.hidden { opacity: 0; }
+
+      /* ---------- P2：准星 / 交互动提示 ---------- */
+      #crosshair {
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 8;
+      }
+      #crosshair .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: rgba(253, 245, 228, 0.75);
+        box-shadow: 0 0 0 2px rgba(74, 64, 51, 0.35);
+        transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      #crosshair.gold .dot {
+        background: #F2C33D;
+        transform: scale(1.5);
+        box-shadow: 0 0 0 2px rgba(180, 130, 20, 0.5), 0 0 14px rgba(242, 195, 61, 0.75);
+      }
+      #prompt {
+        left: 50%;
+        top: calc(50% + 34px);
+        transform: translateX(-50%);
+        font-size: 13px;
+        font-weight: 700;
+        color: #4a4033;
+        background: rgba(253, 245, 228, 0.92);
+        border: 1.5px solid rgba(122, 100, 70, 0.3);
+        border-radius: 999px;
+        padding: 5px 14px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      #prompt.show { opacity: 1; }
+
+      /* ---------- P2：观察卡（galgame 式） ---------- */
+      #observe-card {
+        left: 50%;
+        bottom: 104px;
+        transform: translateX(-50%);
+        width: min(760px, 92vw);
+        z-index: 14;
+      }
+      #observe-card .card { padding: 16px 20px; }
+      #observe-card .head { display: flex; align-items: center; gap: 12px; }
+      #observe-card .avatar {
+        width: 52px; height: 52px; border-radius: 14px;
+        background: #E8D9A8; border: 2px solid rgba(122,100,70,0.35);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px;
+      }
+      #observe-card .who { flex: 1; }
+      #observe-card .nm { font-size: 19px; font-weight: 800; letter-spacing: 0.02em; }
+      #observe-card .sp { font-size: 11.5px; color: #7d6f5c; margin-top: 2px; }
+      #observe-card .chip {
+        font-size: 11px; font-weight: 700; color: #fff;
+        background: #8A6A44; padding: 2px 9px; border-radius: 999px;
+      }
+      #observe-card .chip.flee { background: #D9453A; }
+      #observe-card .chip.alert { background: #E8A93C; }
+      #observe-card .chip.calm { background: #6FA83C; }
+      #observe-card .body { margin-top: 12px; font-size: 13px; line-height: 1.7; color: #4a4033; }
+      #observe-card .quote {
+        margin-top: 8px; padding: 8px 12px; border-left: 3px solid #E8623C;
+        background: rgba(232, 98, 60, 0.08); border-radius: 6px;
+        font-size: 12.5px; color: #6b5a41;
+      }
+      #observe-card .foot { margin-top: 10px; font-size: 11.5px; color: #7d6f5c; }
+      #observe-card[hidden] { display: none; }
+
+      /* ---------- P2：好感度 ---------- */
+      #affection { top: 178px; left: 14px; width: 214px; }
+      #affection[hidden] { display: none; }
+      #affection .row2 { display: flex; align-items: center; gap: 9px; }
+      #affection .av {
+        width: 38px; height: 38px; border-radius: 11px; background: #E8D9A8;
+        border: 2px solid rgba(122,100,70,0.3);
+        display: flex; align-items: center; justify-content: center; font-size: 20px;
+      }
+      #affection .nm { font-size: 14px; font-weight: 800; }
+      #affection .lv { font-size: 11px; color: #7d6f5c; }
+      #affection .bar { height: 9px; border-radius: 99px; background: rgba(122,100,70,0.18); overflow: hidden; margin-top: 8px; }
+      #affection .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #E8A93C, #E8623C); transition: width 0.4s ease; }
+      #affection .tips { font-size: 11px; color: #7d6f5c; margin-top: 6px; line-height: 1.5; }
+
+      /* ---------- P2：食物背包 ---------- */
+      #inventory { right: 14px; bottom: 92px; }
+      #inventory[hidden] { display: none; }
+      #inventory .slots { display: flex; gap: 8px; }
+      #inventory .slot {
+        width: 62px; padding: 6px 4px; border-radius: 10px; text-align: center;
+        background: rgba(255,255,255,0.55); border: 1.5px solid rgba(122,100,70,0.22);
+      }
+      #inventory .slot.sel { border-color: #E8623C; background: rgba(232,98,60,0.12); }
+      #inventory .slot.empty { opacity: 0.42; }
+      #inventory .ic { font-size: 18px; line-height: 1.2; }
+      #inventory .cn { font-size: 10px; color: #7d6f5c; }
+      #inventory .nm2 { font-size: 10.5px; font-weight: 700; }
+
+      /* ---------- P2：飘字提示 ---------- */
+      #toasts {
+        left: 50%; bottom: 300px; transform: translateX(-50%);
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        z-index: 15;
+      }
+      #toasts .t {
+        font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 999px;
+        background: rgba(253,245,228,0.95); border: 1.5px solid rgba(122,100,70,0.25);
+        box-shadow: 0 4px 14px rgba(90,70,40,0.16);
+      }
     </style>
   </head>
   <body>
@@ -136,10 +248,14 @@
         <div class="keys">
           <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 ·
           <kbd>Shift</kbd> 跑 ·
+          <kbd>C</kbd> 蹲下潜行 ·
           鼠标 转视角（点击画面锁定）·
           滚轮 缩放
         </div>
         <div class="keys">
+          <kbd>E</kbd> 观察 / 关闭观察卡 ·
+          <kbd>F</kbd> 投喂 ·
+          <kbd>1</kbd>–<kbd>4</kbd> 选择食物 ·
           <kbd>V</kbd> 切换视角（跟随 / 全岛俯瞰 / 地面 / 资产总览）·
           <kbd>T</kbd> 暂停时间 ·
           <kbd>[</kbd><kbd>]</kbd> 时间速度 ·
@@ -151,11 +267,61 @@
     <div class="hud" id="panel-views">
       <div class="card">
         <div class="title" id="view-hint">纯程序化生成 · 无外部美术资源</div>
-        <div class="sub" id="view-sub">P1 交付：地形 / 沙滩 / 海水与浪花 / 房子 / 灯塔 / 栈桥 / 树草石花 / 玩家 / 昼夜</div>
+        <div class="sub" id="view-sub">P2：大黄 + 信任闭环（潜行 / 观察 / 投喂 / 好感度）</div>
       </div>
     </div>
 
-    <div id="hint">点击画面开始 · WASD 移动</div>
+    <!-- P2：准星与交互提示 -->
+    <div class="hud" id="crosshair"><div class="dot"></div></div>
+    <div class="hud" id="prompt"></div>
+
+    <!-- P2：好感度（首次观察后出现） -->
+    <div class="hud" id="affection" hidden>
+      <div class="card">
+        <div class="row2">
+          <div class="av" id="aff-av">🐶</div>
+          <div>
+            <div class="nm" id="aff-name">大黄</div>
+            <div class="lv" id="aff-level">陌生 · 0 / 100</div>
+          </div>
+        </div>
+        <div class="bar"><i id="aff-bar"></i></div>
+        <div class="tips" id="aff-tip">蹲下（C）慢慢靠近，别吓到它</div>
+      </div>
+    </div>
+
+    <!-- P2：食物背包 -->
+    <div class="hud" id="inventory" hidden>
+      <div class="card">
+        <div class="sub" style="margin:0 0 6px">手里的食物（1-4 切换 · F 投喂）</div>
+        <div class="slots" id="inv-slots"></div>
+      </div>
+    </div>
+
+    <!-- P2：观察卡 -->
+    <div class="hud" id="observe-card" hidden>
+      <div class="card">
+        <div class="head">
+          <div class="avatar" id="card-av">🐶</div>
+          <div class="who">
+            <div class="nm" id="card-name">大黄</div>
+            <div class="sp" id="card-species">狗 · 忠诚的村口看家狗，外刚内软</div>
+          </div>
+          <div class="chip" id="card-state">躲藏中</div>
+        </div>
+        <div class="body" id="card-body">它缩在草丛里，只露出一截尾巴。</div>
+        <div class="quote" id="card-quote">「……」</div>
+        <div class="foot">
+          好感度 <b id="card-aff">0</b> / 100 · 喜欢 <b id="card-like">肉骨头</b> ·
+          按 <kbd>E</kbd> 关闭 · 按 <kbd>F</kbd> 投喂
+        </div>
+      </div>
+    </div>
+
+    <!-- P2：飘字 -->
+    <div class="hud" id="toasts"></div>
+
+    <div id="hint">点击画面开始 · WASD 移动 · 按 C 蹲下潜行</div>
 
     <div id="loading">
       <div class="logo">小岛朋友</div>

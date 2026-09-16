@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "island-friends",
   "private": true,
   "version": "0.1.0",
@@ -11,6 +11,8 @@
     "build:single": "vite build --config vite.config.single.js && node tools/build-single.mjs",
     "audit": "node tools/audit.mjs",
     "test:input": "node tools/test-input.mjs",
+    "test:trust": "node tools/test-trust.mjs",
+    "shoot:dog": "node tools/shoot-dog.mjs",
     "test:single": "node tools/test-single.mjs"
   },
   "dependencies": {

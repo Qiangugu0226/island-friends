@@ -93,6 +93,9 @@ export function createPlayer(assets, palette, cfg, layout) {
     facing: Math.PI * 0.25,
     animPhase: 0,
     running: false,
+    crouching: false,
+    crouchAmount: 0,
+    posture: 'walk',
     inWater: false
   };
   state.position.y = layout.heightAt(state.position.x, state.position.z);
@@ -122,8 +125,12 @@ export function createPlayer(assets, palette, cfg, layout) {
   function update(dt, input, basis, blockers = []) {
     const forwardKey = (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0);
     const strafeKey = (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0);
-    const running = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
+    const running = (input.isDown('ShiftLeft') || input.isDown('ShiftRight')) && !input.isDown('KeyC');
+    // C 蹲下潜行：速度降下来，动物就不容易被惊动
+    const crouching = input.isDown('KeyC');
     state.running = running;
+    state.crouching = crouching;
+    state.posture = crouching ? 'crouch' : running ? 'run' : 'walk';
 
     dir.set(0, 0, 0);
     if (forwardKey || strafeKey) {
@@ -131,7 +138,8 @@ export function createPlayer(assets, palette, cfg, layout) {
       if (dir.lengthSq() > 0) dir.normalize();
     }
 
-    const targetSpeed = dir.lengthSq() > 0 ? (running ? cfg.runSpeed : cfg.walkSpeed) : 0;
+    const baseSpeed = running ? cfg.runSpeed : crouching ? cfg.walkSpeed * (cfg.crouchSpeedFactor ?? 0.42) : cfg.walkSpeed;
+    const targetSpeed = dir.lengthSq() > 0 ? baseSpeed : 0;
     state.speed += (targetSpeed - state.speed) * (1 - Math.exp(-10 * dt));
     if (state.speed < 0.02) state.speed = 0;
 
@@ -206,6 +214,13 @@ export function createPlayer(assets, palette, cfg, layout) {
     body.position.y = bob + idle;
     body.rotation.z = Math.sin(state.animPhase * 2) * 0.02 * swing;
     body.rotation.x = running ? -0.12 * swing : 0;
+
+    // 蹲下：整体压低一点（脚不动，像是缩下去）
+    const targetCrouch = crouching ? 1 : 0;
+    state.crouchAmount += (targetCrouch - state.crouchAmount) * (1 - Math.exp(-10 * dt));
+    const c = state.crouchAmount;
+    body.scale.set(1 + c * 0.06, 1 - c * 0.3, 1 + c * 0.06);
+    body.rotation.x += -c * 0.1;
   }
 
   return {

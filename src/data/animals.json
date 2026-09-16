@@ -1,0 +1,82 @@
+{
+  "_说明": "P2 只实装大黄（狗）；食物系统先做全，方便 P4 直接复用。所有数值都可调，改完刷新即生效。",
+
+  "foods": {
+    "_说明": "食物：id / 名字 / 颜色 / 谁爱吃。P2 只有狗会吃骨头，喂错东西动物会「不太感兴趣」。",
+    "list": [
+      { "id": "bone", "name": "肉骨头", "color": "#E8DCC0", "shape": "bone", "for": ["dahuang"] },
+      { "id": "fish", "name": "小鱼干", "color": "#9FB0B8", "shape": "fish", "for": ["meiqiu"] },
+      { "id": "seed", "name": "鸟瓜子", "color": "#D9B45B", "shape": "seed", "for": ["jiujiu"] },
+      { "id": "weed", "name": "龟水草", "color": "#6FA83C", "shape": "weed", "for": ["manman"] }
+    ],
+    "_产地说明": "村子里散落的拾取点，走过去自动捡起（P2 只要走到 1.6m 内）",
+    "spawns": [
+      { "food": "bone", "x": -33, "z": 20.5 },
+      { "food": "bone", "x": -24, "z": 24 },
+      { "food": "bone", "x": 17, "z": 24 },
+      { "food": "bone", "x": -12, "z": 4 },
+      { "food": "fish", "x": -38, "z": 29 },
+      { "food": "fish", "x": -44, "z": 25 },
+      { "food": "seed", "x": 6, "z": 17 },
+      { "food": "seed", "x": 12, "z": 21 },
+      { "food": "weed", "x": -26, "z": 2 },
+      { "food": "weed", "x": 15, "z": 29 }
+    ]
+  },
+
+  "animals": [
+    {
+      "id": "dahuang",
+      "name": "大黄",
+      "species": "狗",
+      "personality": "忠诚的村口看家狗，外刚内软",
+      "hint": "它守着一根旧骨头，像是在等谁回来。",
+      "color": "#D9A05B",
+      "darkColor": "#B07C3F",
+      "bellyColor": "#F0DCBB",
+      "likeFood": "bone",
+
+      "_躲藏点": "cover 只是给线索用的标签；位置若压在房子/道路上，系统会自动挪开",
+      "hideouts": [
+        { "label": "房后", "x": -25.5, "z": 30.5, "cover": "house" },
+        { "label": "村口草丛", "x": 1.5, "z": 17, "cover": "bush" },
+        { "label": "池塘边", "x": -26, "z": 2.5, "cover": "pond" },
+        { "label": "土地庙旁", "x": -13, "z": 15.5, "cover": "shrine" },
+        { "label": "航标塔下", "x": 2.5, "z": -39.5, "cover": "tower" }
+      ],
+      "startHideout": 1,
+
+      "speed": { "flee": 6.2, "walk": 1.5, "turn": 6.0 },
+
+      "trust": {
+        "_说明": "距离单位=米，时间单位=秒。玩家姿态分 走 / 跑 / 蹲。",
+        "observeRange": 3.5,
+        "clueFar": 15,
+        "clueMid": 8,
+        "clueNear": 5,
+        "fleeRadiusRun": 12.0,
+        "fleeRadiusWalk": 6.8,
+        "fleeRadiusCrouch": 2.4,
+        "alertRadiusRun": 18.0,
+        "alertRadiusWalk": 11.0,
+        "alertRadiusCrouch": 7.0,
+        "calmAfterSec": 8.0,
+        "fleeDistance": 24.0,
+        "hideAgainSec": 2.0
+      },
+
+      "affection": {
+        "max": 100,
+        "feedGain": 20,
+        "feedCooldownSec": 12,
+        "wrongFoodGain": 0,
+        "levels": [
+          { "at": 0, "name": "陌生", "note": "只能远远看到，靠近就跑" },
+          { "at": 20, "name": "认识", "note": "不再跑，接受投喂，会看着你" },
+          { "at": 60, "name": "熟悉", "note": "会凑过来，抖尾巴，告诉你小秘密" },
+          { "at": 100, "name": "挚友", "note": "专属剧情、动物小队（P4）" }
+        ]
+      }
+    }
+  ]
+}
