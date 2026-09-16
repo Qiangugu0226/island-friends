@@ -111,13 +111,13 @@ export function createAudit({ structures, layout, cfg }) {
       // 道路检查：只看小道具与地标（院墙/石厝本来就贴着路，用外接圆判断会误报）
       if (it.kind === 'prop' || it.kind === 'landmark') {
         const roadGap = roadDistance(it.cx, it.cz);
-        if (roadGap < it.r * 0.55) {
+        if (roadGap < -0.15 && roadGap > -6) {
           problems.push({
             type: '压在路上',
             name: it.name,
             x: +it.cx.toFixed(1),
             z: +it.cz.toFixed(1),
-            detail: `侵入路缘 ${(it.r * 0.55 - roadGap).toFixed(2)}m`
+            detail: `侵入路缘 ${(-roadGap).toFixed(2)}m`
           });
         }
         const pondGap = pondClearance(it.cx, it.cz);
@@ -157,6 +157,49 @@ export function createAudit({ structures, layout, cfg }) {
           detail: `重叠 ${overlap.toFixed(2)}m（${(ratio * 100).toFixed(0)}%）`
         });
       }
+    }
+
+    // 道路是否穿过院子 / 房子（沿路采样判定，比外接圆准）
+    const rectHit = (px, pz, pad, halfW, halfD, expand) => {
+      const rot = pad.rot ?? 0;
+      const c = Math.cos(rot);
+      const s = Math.sin(rot);
+      const dx = px - pad.x;
+      const dz = pz - pad.z;
+      const lx = dx * c - dz * s;
+      const lz = dx * s + dz * c;
+      return Math.abs(lx) <= halfW + expand && Math.abs(lz) <= halfD + expand;
+    };
+    const yardMargin = layout.YARD_MARGIN ?? 5.4;
+    const hitPads = new Map();
+    layout.paths.forEach((path, pi) => {
+      for (const s of path.segs) {
+        const len = Math.hypot(s.dx, s.dz);
+        const n = Math.max(2, Math.round(len / 0.6));
+        for (let i = 0; i <= n; i++) {
+          const t = i / n;
+          const x = s.a.x + s.dx * t;
+          const z = s.a.z + s.dz * t;
+          for (const pad of layout.pads) {
+            const inHouse = rectHit(x, z, pad, pad.w / 2, pad.d / 2, 0);
+            const inYard = rectHit(x, z, pad, (pad.w + yardMargin) / 2, (pad.d + yardMargin) / 2, 0);
+            if (!inHouse && !inYard) continue;
+            const key = `${pi}:${pad.id}`;
+            const prev = hitPads.get(key);
+            const depth = inHouse ? 2 : 1;
+            if (!prev || depth > prev.depth) hitPads.set(key, { depth, x, z, id: pad.id, path: pi });
+          }
+        }
+      }
+    });
+    for (const hit of hitPads.values()) {
+      problems.push({
+        type: hit.depth === 2 ? '路穿房子' : '路穿院子',
+        name: `道路#${hit.path + 1} × ${hit.id}`,
+        x: +hit.x.toFixed(1),
+        z: +hit.z.toFixed(1),
+        detail: hit.depth === 2 ? '石板路铺到了房子底下' : '石板路压进院墙里'
+      });
     }
 
     return {

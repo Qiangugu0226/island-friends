@@ -68,7 +68,8 @@ export function buildLayout(cfg) {
   });
 
   // ---------- 道路（沿折线压平） ----------
-  const paths = cfg.paths.map((p) => {
+  const pathList = Array.isArray(cfg.paths) ? cfg.paths : (cfg.paths?.list ?? []);
+  const paths = pathList.map((p) => {
     const nodes = p.points.map(([x, z]) => ({ x, z, y: rawHeight(x, z) }));
     const segs = [];
     for (let i = 0; i < nodes.length - 1; i++) {
@@ -78,6 +79,27 @@ export function buildLayout(cfg) {
     }
     return { ...p, nodes, segs, half: (p.width ?? 2.2) * 0.5, feather: 2.0 };
   });
+
+  // ---------- 院子/房子矩形判定（道路与道具都要避开） ----------
+  const YARD_MARGIN = 5.4;
+
+  function insideRect(px, pz, pad, halfW, halfD, expand = 0) {
+    const rot = pad.rot ?? 0;
+    const c = Math.cos(rot);
+    const s = Math.sin(rot);
+    const dx = px - pad.x;
+    const dz = pz - pad.z;
+    // 世界 → 建筑本地坐标（three 的 rotateY 约定）
+    const lx = dx * c - dz * s;
+    const lz = dx * s + dz * c;
+    return Math.abs(lx) <= halfW + expand && Math.abs(lz) <= halfD + expand;
+  }
+
+  const insideHouse = (x, z, expand = 0) =>
+    pads.some((p) => insideRect(x, z, p, p.w / 2, p.d / 2, expand));
+  const insideYard = (x, z, expand = 0) =>
+    pads.some((p) => insideRect(x, z, p, (p.w + YARD_MARGIN) / 2, (p.d + YARD_MARGIN) / 2, expand));
+  const insideCompound = (x, z, expand = 0) => insideHouse(x, z, expand) || insideYard(x, z, expand);
 
   function nearestOnPaths(x, z) {
     let best = null;
@@ -200,6 +222,10 @@ export function buildLayout(cfg) {
     flatPads,
     ponds,
     paths,
+    YARD_MARGIN,
+    insideHouse,
+    insideYard,
+    insideCompound,
     exclusions,
     isFree,
     shoreline,

@@ -5,17 +5,10 @@
 //   node tools/shoot.mjs p15-top "view=top"
 //   node tools/shoot.mjs p15-village "view=follow&x=-14&z=9"
 // 输出：shots/<名称>.png，控制台错误会打印出来。
-import { spawn } from 'node:child_process';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import puppeteer from 'puppeteer-core';
-
-const EDGE_CANDIDATES = [
-  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
-];
+import { pickTarget, BROWSER_ARGS, browserPath } from './lib/target.mjs';
 
 const args = process.argv.slice(2);
 const name = args[0] ?? 'shot';
@@ -24,26 +17,23 @@ const widthArg = args.indexOf('--w');
 const heightArg = args.indexOf('--h');
 const width = widthArg >= 0 ? Number(args[widthArg + 1]) : 1600;
 const height = heightArg >= 0 ? Number(args[heightArg + 1]) : 900;
-const port = process.env.SHOOT_PORT ?? '5173';
-const url = `http://127.0.0.1:${port}/${query ? `?${query}` : ''}`;
 
-const browserPath = EDGE_CANDIDATES.find((p) => existsSync(p));
-if (!browserPath) {
-  console.error('找不到 Edge/Chrome 可执行文件');
-  process.exit(1);
-}
+const target = await pickTarget();
+const url = `${target.url}${query ? `?${query}` : ''}`;
+const executablePath = browserPath([
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+]);
 
 mkdirSync('shots', { recursive: true });
 
 const browser = await puppeteer.launch({
-  executablePath: browserPath,
+  executablePath,
   headless: true,
   args: [
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader',
-    '--hide-scrollbars',
+    ...BROWSER_ARGS,
     `--window-size=${width},${height}`
   ]
 });

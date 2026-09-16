@@ -26,6 +26,8 @@ export function buildStructures(scene, layout, assets, palette) {
         const z = s.a.z + s.dz * t + (rand() - 0.5) * 0.28;
         const y = layout.heightAt(x, z) + 0.05;
         if (y < -0.2) continue;
+        // 石板不许铺进房子/院子里（道路若靠得太近，这里会把石板掐掉，避免插进院墙）
+        if (layout.insideCompound(x, z, 0.15)) continue;
         slabPositions.push({
           x,
           y,
@@ -291,7 +293,7 @@ export function buildStructures(scene, layout, assets, palette) {
 
   const P = cfg.props ?? {};
   place(assets.makeWell, P.well, { name: '水井', blockerRadius: 1.5, blockerHeight: 3.4, radius: 1.6 });
-  place(assets.makeMillstone, P.millstone, { name: '石磨', blockerRadius: 1.2, radius: 1.2 });
+  place(assets.makeMillstone, P.millstone, { name: '石磨', blockerRadius: 1.2, radius: 1.6 });
   place(() => assets.makeHaystack(rand), P.haystacks, { name: '稻草堆', blockerRadius: 1.3, radius: 1.3 });
   place(() => assets.makePumpkin(rand), P.pumpkins, { name: '南瓜', sink: 0.04 });
   place(assets.makeBarrel, P.barrels, { name: '木桶', blockerRadius: 0.55, radius: 0.7 });
