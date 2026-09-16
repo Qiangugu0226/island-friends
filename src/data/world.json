@@ -176,13 +176,14 @@
   },
 
   "camera": {
+    "_说明": "minPitchDeg 用负数就能抬头看天（相机降到玩家下方再往上看）",
     "fov": 52,
     "distance": 13.5,
     "minDistance": 5,
     "maxDistance": 30,
     "pitchDeg": 40,
-    "minPitchDeg": 12,
-    "maxPitchDeg": 74,
+    "minPitchDeg": -32,
+    "maxPitchDeg": 85,
     "followLerp": 9.0,
     "mouseSensitivity": 0.0028
   },
@@ -193,7 +194,8 @@
     "turnLerp": 12.0,
     "height": 1.62,
     "spawn": { "x": -44, "z": 30 },
-    "waterDepthLimit": 0.55
+    "waterDepthLimit": 0.55,
+    "pondDepthLimit": 0.8
   },
 
   "gallery": {

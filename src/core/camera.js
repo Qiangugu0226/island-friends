@@ -13,8 +13,8 @@ export function createCameraRig(camera, cfg, input) {
     orbitTime: 0
   };
 
-  const minPitch = THREE.MathUtils.degToRad(cfg.minPitchDeg ?? 12);
-  const maxPitch = THREE.MathUtils.degToRad(cfg.maxPitchDeg ?? 74);
+  const minPitch = THREE.MathUtils.degToRad(cfg.minPitchDeg ?? -32);
+  const maxPitch = THREE.MathUtils.degToRad(cfg.maxPitchDeg ?? 85);
   const forward = new THREE.Vector3();
   const right = new THREE.Vector3();
   const desired = new THREE.Vector3();

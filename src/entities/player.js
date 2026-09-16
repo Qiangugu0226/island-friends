@@ -114,9 +114,15 @@ export function createPlayer(assets, palette, cfg, layout) {
   }
 
   function canStand(x, z, blockers) {
-    if (layout.heightAt(x, z) < -cfg.waterDepthLimit) return false;
+    const h = layout.heightAt(x, z);
+    if (h < -cfg.waterDepthLimit) return false;
+    // 池塘：可以涉水走进去，只有最深处才拦住（不是整片禁区）
     for (const p of layout.ponds) {
-      if ((x - p.x) ** 2 + (z - p.z) ** 2 < (p.r * 0.98) ** 2) return false;
+      const d = Math.hypot(x - p.x, z - p.z);
+      if (d < p.r) {
+        const depth = p.surfaceY - h;
+        if (depth > (cfg.pondDepthLimit ?? 0.75)) return false;
+      }
     }
     if (blocked(x, z, blockers)) return false;
     return true;
@@ -149,6 +155,18 @@ export function createPlayer(assets, palette, cfg, layout) {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       state.facing += diff * (1 - Math.exp(-(cfg.turnLerp ?? 12) * dt));
+    }
+
+    // 已经卡在碰撞体里（例如被传送到障碍物上、或道具自动摆位挪到了脚下）：
+    // 先慢慢挤出来，否则任何方向都判定为不可站立，会彻底动不了
+    const stuck = blocked(state.position.x, state.position.z, blockers);
+    if (stuck) {
+      const dx = state.position.x - stuck.x;
+      const dz = state.position.z - stuck.z;
+      const len = Math.hypot(dx, dz) || 0.0001;
+      const pushSpeed = Math.min(3.2 * dt, 0.2);
+      state.position.x += (dx / len) * pushSpeed;
+      state.position.z += (dz / len) * pushSpeed;
     }
 
     if (state.speed > 0) {

@@ -1,0 +1,29 @@
+{
+  "ponds": [
+    {
+      "x": -22,
+      "z": -4,
+      "r": 9,
+      "surfaceY": 5.28,
+      "floorY": 3.78
+    },
+    {
+      "x": 21,
+      "z": 34,
+      "r": 7,
+      "surfaceY": 4.42,
+      "floorY": 3.17
+    }
+  ],
+  "cam": {
+    "pos": [
+      -7.13,
+      4.12,
+      -6.13
+    ],
+    "pitchDeg": -28,
+    "yawDeg": 165.6,
+    "mode": "follow"
+  },
+  "maxJump": 2.91
+}

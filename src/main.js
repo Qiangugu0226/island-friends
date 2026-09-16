@@ -248,6 +248,7 @@ async function boot() {
 
   const blockers = structures.blockers;
   const focus = new THREE.Vector3();
+  const camAvoid = new THREE.Vector3();
   const galleryLook = gallery.cameraLook.clone();
 
   // 相机避让：不要穿进房子/灯塔，也不要钻到地面以下
@@ -306,7 +307,10 @@ async function boot() {
       camera.position.copy(freeCam.pos);
       camera.lookAt(freeCam.look);
     } else if (rig.mode === 'follow') {
-      resolveCamera(camera.position);
+      // 相机避让（建筑/地形）先算到临时位置，再平滑过去 —— 直接硬推会「抽动」
+      camAvoid.copy(camera.position);
+      resolveCamera(camAvoid);
+      camera.position.lerp(camAvoid, 1 - Math.exp(-16 * dt));
       camera.lookAt(player.position.x, player.position.y + 0.6, player.position.z);
     }
 
@@ -540,6 +544,36 @@ async function boot() {
     setFollow: (dist) => {
       if (dist) rig.state.distance = dist;
       rig.setMode('follow');
+    },
+    setPitch: (deg) => {
+      rig.state.pitch = (deg * Math.PI) / 180;
+    },
+    cameraInfo: () => ({
+      pos: camera.position.toArray().map((v) => +v.toFixed(2)),
+      pitchDeg: +((rig.state.pitch * 180) / Math.PI).toFixed(1),
+      yawDeg: +((rig.state.yaw * 180) / Math.PI).toFixed(1),
+      mode: rig.mode
+    }),
+    pondInfo: () => layout.ponds.map((p) => ({ x: p.x, z: p.z, r: p.r, surfaceY: +p.surfaceY.toFixed(2), floorY: +p.floorY.toFixed(2) })),
+    pickups: () =>
+      affection.state.pickups
+        .filter((p) => !p.taken)
+        .map((p) => ({ food: p.food, x: +p.mesh.position.x.toFixed(1), z: +p.mesh.position.z.toFixed(1) })),
+    groundAt: (x, z) => +layout.heightAt(x, z).toFixed(2),
+    blockersNear: (x, z, r = 8) =>
+      blockers
+        .map((b) => ({ ...b, d: +Math.hypot(b.x - x, b.z - z).toFixed(2) }))
+        .filter((b) => b.d < r + b.r)
+        .sort((a, b) => a.d - b.d)
+        .map((b) => ({ x: +b.x.toFixed(1), z: +b.z.toFixed(1), r: b.r, d: b.d })),
+    canStandAt: (x, z) => {
+      const h = layout.heightAt(x, z);
+      const pondHit = layout.ponds.some((p) => {
+        const d = Math.hypot(x - p.x, z - p.z);
+        return d < p.r && p.surfaceY - h > 0.8;
+      });
+      const near = blockers.find((b) => (x - b.x) ** 2 + (z - b.z) ** 2 < (b.r + 0.34) ** 2);
+      return { canStand: h >= -0.55 && !pondHit && !near, h: +h.toFixed(2), pondHit, blockedBy: near ?? null };
     },
     ready: true
   };

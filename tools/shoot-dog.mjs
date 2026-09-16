@@ -1,4 +1,4 @@
-﻿// 大黄各状态验收截图：躲藏 / 近线索 / 警觉 / 吓跑 / 观察卡 / 投喂
+// 大黄各状态验收截图：躲藏 / 近线索 / 警觉 / 吓跑 / 观察卡 / 投喂
 // 用法：node tools/shoot-dog.mjs [场景名...]   不传就全拍
 import { mkdirSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';

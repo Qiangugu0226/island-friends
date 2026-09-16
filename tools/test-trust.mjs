@@ -1,4 +1,4 @@
-﻿// 大黄信任闭环自动测试：潜行 / 警觉 / 吓跑 / 观察 / 投喂 / 好感度 / 三层线索
+// 大黄信任闭环自动测试：潜行 / 警觉 / 吓跑 / 观察 / 投喂 / 好感度 / 三层线索
 // 用法：node tools/test-trust.mjs      （自动选择开发服务器或单文件离线版）
 import { setTimeout as delay } from 'node:timers/promises';
 import puppeteer from 'puppeteer-core';

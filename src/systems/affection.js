@@ -65,15 +65,55 @@ export function createAffection({ scene, layout, assets, palette, cfg, bubbles, 
   pickupsGroup.name = 'foodPickups';
   scene.add(pickupsGroup);
 
+  // 拾取物头顶的闪光标记（让它在草丛里也好认）
+  const sparkleTex = (() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 64;
+    const c = canvas.getContext('2d');
+    const grd = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,252,232,1)');
+    grd.addColorStop(0.35, 'rgba(255,226,150,0.7)');
+    grd.addColorStop(1, 'rgba(255,226,150,0)');
+    c.fillStyle = grd;
+    c.fillRect(0, 0, 64, 64);
+    c.strokeStyle = 'rgba(255,255,255,0.85)';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(32, 10); c.lineTo(32, 54);
+    c.moveTo(10, 32); c.lineTo(54, 32);
+    c.stroke();
+    const t = new THREE.CanvasTexture(canvas);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+
   for (const spawn of cfg.foods.spawns) {
     const food = foodById[spawn.food];
     if (!food) continue;
     if (layout.insideCompound(spawn.x, spawn.z, 0.5)) continue;
+
+    const holder = new THREE.Group();
     const mesh = makeFoodMesh(food);
-    const y = layout.heightAt(spawn.x, spawn.z) + 0.14;
-    mesh.position.set(spawn.x, y, spawn.z);
-    pickupsGroup.add(mesh);
-    state.pickups.push({ food: food.id, mesh, baseY: y, taken: false, phase: Math.random() * 6.28 });
+    mesh.scale.setScalar(1.25);
+    holder.add(mesh);
+
+    const sparkle = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkleTex, transparent: true, depthWrite: false }));
+    sparkle.scale.set(0.42, 0.42, 1);
+    sparkle.position.y = 0.46;
+    holder.add(sparkle);
+
+    const y = layout.heightAt(spawn.x, spawn.z) + 0.16;
+    holder.position.set(spawn.x, y, spawn.z);
+    pickupsGroup.add(holder);
+    state.pickups.push({
+      food: food.id,
+      mesh: holder,
+      spin: mesh,
+      sparkle,
+      baseY: y,
+      taken: false,
+      phase: Math.random() * 6.28
+    });
   }
 
   function toast(text, color = '#3A2E26') {
@@ -147,9 +187,16 @@ export function createAffection({ scene, layout, assets, palette, cfg, bubbles, 
     for (const p of state.pickups) {
       if (p.taken) continue;
       p.phase += dt;
-      p.mesh.position.y = p.baseY + Math.sin(p.phase * 1.6) * 0.05;
-      p.mesh.rotation.y += dt * 0.7;
+      p.mesh.position.y = p.baseY + Math.sin(p.phase * 1.6) * 0.06;
+      p.spin.rotation.y += dt * 0.9;
       const d = Math.hypot(p.mesh.position.x - playerPos.x, p.mesh.position.z - playerPos.z);
+      // 靠近就放大 + 闪光更亮，草丛里也好认
+      const near = d < 8;
+      const pop = (near ? 1.22 : 1) * (1 + Math.sin(p.phase * 2.2) * 0.05);
+      p.mesh.scale.setScalar(pop);
+      const s = (near ? 0.6 : 0.42) * (1 + Math.sin(p.phase * 3.1) * 0.12);
+      p.sparkle.scale.set(s, s, 1);
+      p.sparkle.material.opacity = near ? 1 : 0.75;
       if (d < 1.7) {
         p.taken = true;
         pickupsGroup.remove(p.mesh);
