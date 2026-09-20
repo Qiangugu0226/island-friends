@@ -113,14 +113,32 @@ export function buildStructures(scene, layout, assets, palette) {
     });
     stats.houses++;
 
-    // 院墙：顺着地形围出**不规则曲线**（不是矩形），门开在朝村子中心那一侧
+    // 院墙：规整四边形（4 个角 + 4 条边的中点，门只开在边的中点上）。
+    // 注意角落用的是"同一个点"，所以不会像最早那样两条边各自铺满、在角上交叉穿模。
     const fw = pad.w + 5.4;
     const fd = pad.d + 5.4;
-    const outline = organicRing(pad.x, pad.z, fw / 2, fd / 2, pad.rot ?? 0, 28);
+    const cosP = Math.cos(pad.rot ?? 0);
+    const sinP = Math.sin(pad.rot ?? 0);
+    const corner = [
+      [-fw / 2, -fd / 2],
+      [fw / 2, -fd / 2],
+      [fw / 2, fd / 2],
+      [-fw / 2, fd / 2]
+    ];
+    const outline = [];
+    for (let i = 0; i < 4; i++) {
+      const a = corner[i];
+      const b = corner[(i + 1) % 4];
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      // 顺序：边中点 → 角 → 边中点 → 角……（偶数下标都是边中点，门只从这里挑）
+      outline.push([pad.x + mid[0] * cosP + mid[1] * sinP, pad.z - mid[0] * sinP + mid[1] * cosP]);
+      outline.push([pad.x + b[0] * cosP + b[1] * sinP, pad.z - b[0] * sinP + b[1] * cosP]);
+    }
     const toCenter = new THREE.Vector2(-pad.x, -pad.z).normalize();
     let gateIndex = 0;
     let bestDot = -Infinity;
     outline.forEach(([px, pz], i) => {
+      if (i % 2 !== 0) return;
       const d = new THREE.Vector2(px - pad.x, pz - pad.z).normalize().dot(toCenter);
       if (d > bestDot) {
         bestDot = d;
@@ -129,12 +147,15 @@ export function buildStructures(scene, layout, assets, palette) {
     });
     const gate = { x: outline[gateIndex][0], z: outline[gateIndex][1], r: 2.6 };
     gates.push(gate);
+    // 暖色夯土墙 + 稻草压顶（温馨路线；石砌留给航标塔那圈围栏）
     const yard = assets.makeStoneWallPath(outline, {
       gaps: [gate],
       groundAt: layout.heightAt,
-      thickness: 0.42,
-      step: 1.0,
-      maxSegFactor: 1.3
+      color: '#E8C89C',
+      capColor: '#E0BC63',
+      step: 1.6,
+      maxSegFactor: 2.0,
+      thickness: 0.42
     });
     yard.name = `院墙:${pad.id}`;
     yard.userData.audit = { kind: 'decor' };

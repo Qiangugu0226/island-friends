@@ -14,6 +14,8 @@ export function createAssets(palette, textures) {
   const stoneFine = T.stone ? withRepeat(T.stone, 3.2, 1.2) : null;
   const woodMain = T.wood ? withRepeat(T.wood, 1.6, 1.6) : null;
   const woodCoarse = T.wood ? withRepeat(T.wood, 1.1, 1.1) : null;
+  // 院墙专用：暖色夯土/抹灰（温馨路线，和石砌的灯塔围栏区分开）
+  const clayMain = T.clay ? withRepeat(T.clay, 2.4, 1.3) : null;
   const texMap = {
     [palette.wallStone]: stoneMain,
     [palette.wallStoneAlt]: stoneMain,
@@ -30,6 +32,7 @@ export function createAssets(palette, textures) {
     [palette.stone]: stoneFine,
     [palette.stoneDark]: stoneFine,
     [palette.foundation]: stoneFine,
+    '#E8C89C': clayMain, // 院墙暖夯土色（这个键同时决定颜色与贴图）
     '#E0BC63': T.thatch ?? null,
     '#CFA94F': T.thatch ?? null
   };
@@ -995,6 +998,7 @@ export function createAssets(palette, textures) {
 
     const canopyMat = mat(palette.banyanLeaf);
     const blobs = 5 + Math.floor(rand() * 3);
+    const blobRadii = [];
     for (let i = 0; i < blobs; i++) {
       const a = (i / blobs) * Math.PI * 2;
       const r = i === 0 ? 0 : 1.1 + rand() * 0.7;
@@ -1004,12 +1008,16 @@ export function createAssets(palette, textures) {
       blob.position.set(Math.cos(a) * r, 3.1 + (i === 0 ? 0.35 : 0), Math.sin(a) * r);
       blob.rotation.y = rand() * Math.PI;
       g.add(blob);
+      blobRadii.push({ a, r });
     }
+    // 气生根：必须从树冠里垂下来（半径跟树冠同圈、顶端伸进树冠内部、底端到地面），
+    // 否则会变成"挂在半空的棍子"（审计的「零件悬浮」就是这样抓出来的）
     for (let i = 0; i < 5; i++) {
-      const a = rand() * Math.PI * 2;
-      const r = 1.2 + rand() * 1.4;
+      const src = blobRadii[(i + 1) % blobRadii.length];
+      const a = src.a + (rand() - 0.5) * 0.5;
+      const r = src.r + (rand() - 0.5) * 0.5;
       const root = new THREE.Mesh(banyanRootGeo, mat(palette.trunkDark));
-      root.position.set(Math.cos(a) * r, 2.05, Math.sin(a) * r);
+      root.position.set(Math.cos(a) * r, 2.6, Math.sin(a) * r);
       g.add(root);
     }
     return shade(g);

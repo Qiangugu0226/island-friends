@@ -90,9 +90,12 @@ for (const s of rg0.segs) {
   if (!best || face > best.face) best = { s, mx, mz, nx, nz, face, len: L };
 }
 const gY2 = await page.evaluate(([x, z]) => window.__island.groundAt(x, z), [best.mx, best.mz]);
-const cam2 = [best.mx + best.nx * 4.5, gY2 + 1.35, best.mz + best.nz * 4.5];
-await page.evaluate(([p, l]) => window.__island.setFreeCam(p, l), [cam2, [best.mx, gY2 + 0.5, best.mz]]);
-await delay(700);
-await page.screenshot({ path: 'shots/p5f-wall-close.png' });
-console.log(`  近景：段(${best.mx.toFixed(1)},${best.mz.toFixed(1)}) 长 ${best.len.toFixed(2)}m 正对度 ${best.face.toFixed(2)} → shots/p5f-wall-close.png`);
+// 两面都拍：靠光那一面和背光那一面
+for (const [tag, sign] of [['sun', 1], ['shade', -1]]) {
+  const cam2 = [best.mx + best.nx * 4.5 * sign, gY2 + 1.35, best.mz + best.nz * 4.5 * sign];
+  await page.evaluate(([p, l]) => window.__island.setFreeCam(p, l), [cam2, [best.mx, gY2 + 0.5, best.mz]]);
+  await delay(700);
+  await page.screenshot({ path: `shots/p5f-wall-${tag}.png` });
+  console.log(`  近景(${tag})：段(${best.mx.toFixed(1)},${best.mz.toFixed(1)}) 长 ${best.len.toFixed(2)}m → shots/p5f-wall-${tag}.png`);
+}
 await browser.close();

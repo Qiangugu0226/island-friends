@@ -273,6 +273,56 @@ export function createTextures(palette, seed = 1) {
     return t;
   }
 
+  // ---------- 暖色夯土 / 抹灰（院墙用：温馨，带手抹痕迹与稻草碎屑） ----------
+  function clay() {
+    const size = 256;
+    const c = canvas(size);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#f4e2c4';
+    ctx.fillRect(0, 0, size, size);
+    // 夯土分层：一行行夯出来的横向色带（要看得见，否则整面墙像刷了层平漆）
+    for (let i = 0; i < 8; i++) {
+      const y = (i + rnd() * 0.55) * (size / 8);
+      ctx.fillStyle = `rgba(206,170,120,${0.16 + rnd() * 0.12})`;
+      ctx.fillRect(0, y, size, 8 + rnd() * 12);
+      ctx.fillStyle = 'rgba(255,248,232,0.35)';
+      ctx.fillRect(0, y - 2, size, 2);
+    }
+    // 手抹的晕染（一亮一暗，做出"抹子走过的痕迹"）
+    blotches(ctx, size, 34, 'rgba(255,250,236,0.55)', 'rgba(208,172,120,0.38)', 44);
+    blotches(ctx, size, 16, 'rgba(255,255,255,0.25)', 'rgba(186,146,96,0.32)', 70);
+    // 稻草碎屑（夯土里混的草筋）
+    ctx.strokeStyle = 'rgba(176,136,78,0.55)';
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 95; i++) {
+      const x = rnd() * size;
+      const y = rnd() * size;
+      const a = rnd() * Math.PI;
+      const l = 3 + rnd() * 7;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+      ctx.stroke();
+    }
+    // 细裂纹（老墙的味道）
+    ctx.strokeStyle = 'rgba(160,124,74,0.30)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 7; i++) {
+      let x = rnd() * size;
+      let y = rnd() * size;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 5; k++) {
+        x += (rnd() - 0.5) * 26;
+        y += 6 + rnd() * 12;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    grain(ctx, size, 10);
+    return finish(c, 1);
+  }
+
   const tex = {
     roofTiles: roofTiles(),
     stone: stoneWall(),
@@ -280,6 +330,7 @@ export function createTextures(palette, seed = 1) {
     brick: brick(),
     wood: wood(),
     thatch: thatch(),
+    clay: clay(),
     ground: groundDetail()
   };
   Object.entries(tex).forEach(([k, t]) => (t.name = k));

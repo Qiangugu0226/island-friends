@@ -36,7 +36,7 @@ console.log(`碰撞体：圆形 ${info.circles} 个 · 院墙 ${info.walls} 段 
 const walls = await ev(() => window.__island.wallsList());
 const groups = await ev(() => window.__island.wallGroups());
 check('院墙有碰撞段', walls.length >= 20, `${walls.length} 段，聚成 ${groups.groups} 个圈（尺寸 ${groups.sizes.join('/')}）`);
-check('院墙是曲线（不是 4 段矩形）', groups.sizes.every((s) => s >= 8), `每个圈最少 ${Math.min(...groups.sizes)} 段`);
+check('每圈院墙都切成足够多的碰撞段（不是一根大长方体）', groups.sizes.every((s) => s >= 8), `每个圈最少 ${Math.min(...groups.sizes)} 段`);
 
 // 取一段"离门洞最远"的墙：门口本来就能过，选到那儿测穿墙会误判
 const gates = await ev(() => window.__island.wallGates());
@@ -48,20 +48,23 @@ const gateDist = (s) => {
 const w0 = [...walls].sort((a, b) => gateDist(b) - gateDist(a))[0];
 const mx = (w0.ax + w0.bx) / 2;
 const mz = (w0.az + w0.bz) / 2;
-const dirX = (w0.bx - w0.ax) / Math.max(1e-6, Math.hypot(w0.bx - w0.ax, w0.bz - w0.az));
-const dirZ = (w0.bz - w0.az) / Math.max(1e-6, Math.hypot(w0.bx - w0.ax, w0.bz - w0.az));
-const perpX = -dirZ;
-const perpZ = dirX;
+// "院外"方向 = 由圈心指向这段墙（对矩形和曲线都成立；不能再靠墙的垂线，垂线可能指进院子里）
+const ring = walls.filter((s) => Math.hypot((s.ax + s.bx) / 2 - mx, (s.az + s.bz) / 2 - mz) < 14);
+const rcx = ring.reduce((a, s) => a + (s.ax + s.bx) / 2, 0) / ring.length;
+const rcz = ring.reduce((a, s) => a + (s.az + s.bz) / 2, 0) / ring.length;
+const radLen = Math.max(1e-6, Math.hypot(mx - rcx, mz - rcz));
+const outX0 = (mx - rcx) / radLen;
+const outZ0 = (mz - rcz) / radLen;
 const tWall = await ev(([x, z]) => window.__island.hitTest(x, z), [mx, mz]);
 check('院墙墙身会挡住玩家', tWall.wall === true, `墙段中点(${mx.toFixed(1)},${mz.toFixed(1)}) wall=${tWall.wall}`);
-const outX = mx + perpX * 1.2;
-const outZ = mz + perpZ * 1.2;
+const outX = mx + outX0 * 1.2;
+const outZ = mz + outZ0 * 1.2;
 const tOut = await ev(([x, z]) => window.__island.hitTest(x, z), [outX, outZ]);
 check('墙外 1.2m 可通行（墙是薄带）', tOut.wall === false, `(${outX.toFixed(1)},${outZ.toFixed(1)}) wall=${tOut.wall}`);
 
 // 实际走过去：从墙外 3m 朝墙走 2.6 秒，应该被挡在外面（不能穿到墙内侧）
-const startX = mx + perpX * 3;
-const startZ = mz + perpZ * 3;
+const startX = mx + outX0 * 3;
+const startZ = mz + outZ0 * 3;
 await ev(([x, z]) => window.__island.teleport(x, z), [startX, startZ]);
 await delay(400);
 const yawTo = (from, to) => (Math.atan2(from[0] - to[0], from[1] - to[1]) * 180) / Math.PI;
@@ -71,8 +74,8 @@ await page.keyboard.down('KeyW');
 await delay(2600);
 await page.keyboard.up('KeyW');
 const after = await ev(() => window.__island.pos());
-// 是否跨到了墙的另一侧：比较相对墙段的垂直侧向位移
-const sideNow = (after[0] - mx) * perpX + (after[2] - mz) * perpZ;
+// 是否跨到了墙的另一侧：比较沿"向外方向"的位移
+const sideNow = (after[0] - mx) * outX0 + (after[2] - mz) * outZ0;
 check('朝院墙走不会穿过去', sideNow > 0, `停在 (${after[0].toFixed(1)}, ${after[2].toFixed(1)})，侧向 ${sideNow.toFixed(2)}m（>0 = 仍在出发侧）`);
 
 // 每个门洞都真的能过（曲线院墙上的门是算出来的，必须验证没被墙段堵住）
