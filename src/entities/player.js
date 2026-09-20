@@ -86,6 +86,13 @@ export function createPlayer(assets, palette, cfg, layout) {
     return clone;
   }
 
+  // 碰撞统一交给 collision 系统（圆形碰撞 + 院墙 + 平台），没传就退回旧逻辑
+  const collider = cfg.collision ?? null;
+
+  function groundHeightAt(x, z) {
+    return collider ? collider.groundAt(x, z, layout.heightAt) : layout.heightAt(x, z);
+  }
+
   const state = {
     position: new THREE.Vector3(cfg.spawn.x, 0, cfg.spawn.z),
     velocity: new THREE.Vector3(),
@@ -96,15 +103,17 @@ export function createPlayer(assets, palette, cfg, layout) {
     crouching: false,
     crouchAmount: 0,
     posture: 'walk',
-    inWater: false
+    inWater: false,
+    onPlatform: false
   };
-  state.position.y = layout.heightAt(state.position.x, state.position.z);
+  state.position.y = groundHeightAt(state.position.x, state.position.z);
   root.position.copy(state.position);
 
   const dir = new THREE.Vector3();
   const tmp = new THREE.Vector3();
 
   function blocked(x, z, blockers) {
+    if (collider) return collider.hitCircle(x, z, 0.34, null);
     for (const b of blockers) {
       const dx = x - b.x;
       const dz = z - b.z;
@@ -113,17 +122,20 @@ export function createPlayer(assets, palette, cfg, layout) {
     return null;
   }
 
-  function canStand(x, z, blockers) {
-    const h = layout.heightAt(x, z);
+  function canStand(x, z, blockers, fromY = null) {
+    const h = groundHeightAt(x, z);
     if (h < -cfg.waterDepthLimit) return false;
     // 池塘：可以涉水走进去，只有最深处才拦住（不是整片禁区）
     for (const p of layout.ponds) {
       const d = Math.hypot(x - p.x, z - p.z);
-      if (d < p.r) {
-        const depth = p.surfaceY - h;
+      if (d < p.r && collider?.platformAt(x, z) == null) {
+        const depth = p.surfaceY - layout.heightAt(x, z);
         if (depth > (cfg.pondDepthLimit ?? 0.75)) return false;
       }
     }
+    if (collider?.hitWall(x, z)) return false;
+    // 台阶落差太大就上不去（能走上码头栈台，但爬不上院墙）
+    if (fromY !== null && h - fromY > (cfg.stepUp ?? 0.75)) return false;
     if (blocked(x, z, blockers)) return false;
     return true;
   }
@@ -173,10 +185,11 @@ export function createPlayer(assets, palette, cfg, layout) {
       const step = state.speed * dt;
       const nx = state.position.x + dir.x * step;
       const nz = state.position.z + dir.z * step;
-      if (canStand(nx, nz, blockers)) {
+      const fromY = groundHeightAt(state.position.x, state.position.z);
+      if (canStand(nx, nz, blockers, fromY)) {
         state.position.x = nx;
         state.position.z = nz;
-      } else if (canStand(nx, state.position.z, blockers)) {
+      } else if (canStand(nx, state.position.z, blockers, fromY)) {
         const hit = blocked(nx, state.position.z, blockers);
         if (hit) {
           const push = tmp.set(state.position.x - hit.x, 0, state.position.z - hit.z);
@@ -188,7 +201,7 @@ export function createPlayer(assets, palette, cfg, layout) {
         } else {
           state.position.x = nx;
         }
-      } else if (canStand(state.position.x, nz, blockers)) {
+      } else if (canStand(state.position.x, nz, blockers, fromY)) {
         const hit = blocked(state.position.x, nz, blockers);
         if (hit) {
           const push = tmp.set(state.position.x - hit.x, 0, state.position.z - hit.z);
@@ -203,7 +216,10 @@ export function createPlayer(assets, palette, cfg, layout) {
       }
     }
 
-    state.position.y = layout.heightAt(state.position.x, state.position.z);
+    // 站在平台上（码头栈台）时脚底取平台高度
+    const standY = groundHeightAt(state.position.x, state.position.z);
+    state.position.y += (standY - state.position.y) * (1 - Math.exp(-14 * dt));
+    state.onPlatform = collider?.platformAt(state.position.x, state.position.z) != null;
     state.inWater = state.position.y < 0.35;
 
     root.position.copy(state.position);
@@ -248,7 +264,7 @@ export function createPlayer(assets, palette, cfg, layout) {
     buildPreview,
     get position() { return state.position; },
     teleport(x, z) {
-      state.position.set(x, layout.heightAt(x, z), z);
+      state.position.set(x, groundHeightAt(x, z), z);
       root.position.copy(state.position);
     }
   };

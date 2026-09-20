@@ -475,8 +475,9 @@ export function createAssets(palette, textures) {
       g.add(bollard);
     }
 
-    // 给外面用：栈台顶面高度、靠船位置（本地坐标）
+    // 给外面用：栈台顶面高度、可行走范围、靠船位置（本地坐标）
     g.userData.deckTopY = DECK_TOP;
+    g.userData.deckLocal = { cx: 0, cz: deckCenterZ, halfW: W / 2, halfD: pierLen / 2 };
     g.userData.moorLocal = [W / 2 + 1.55, DECK_TOP - 0.95, deckCenterZ - pierLen * 0.22];
     return shade(g);
   }
@@ -650,7 +651,7 @@ export function createAssets(palette, textures) {
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.18, 1.0, 12, 1, true), mat(palette.stone));
     ring.position.y = 0.5;
     g.add(ring);
-    const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.94, 0.98, 1.0, 12, 1, true), mat(palette.stoneDark));
+    const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.94, 0.98, 1.0, 12, 1, true), mat(palette.stoneDark, { side: THREE.DoubleSide }));
     inner.position.y = 0.5;
     g.add(inner);
     // 井沿石圈

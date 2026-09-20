@@ -358,6 +358,15 @@ export function scatterWorld(scene, layout, assets, palette) {
   const tuftMesh = buildInstanced(assets.geos.tuftGeo, tuftMat, tuftItems, { cast: false, colored: true });
   if (tuftMesh) group.add(tuftMesh);
 
+  // ---------- 碰撞体：树 / 竹子 / 芭蕉 / 石头 / 树桩（不然玩家会直接穿过去） ----------
+  const colliders = [];
+  trunks.forEach((t) => colliders.push({ x: t.x, z: t.z, r: 0.28 }));
+  banyanTrunks.forEach((t) => colliders.push({ x: t.x, z: t.z, r: 0.62 }));
+  bananaStems.forEach((t) => colliders.push({ x: t.x, z: t.z, r: 0.3 }));
+  bambooItems.forEach((t) => colliders.push({ x: t.x, z: t.z, r: 0.24 }));
+  rockItems.forEach((it) => colliders.push({ x: it.x, z: it.z, r: 0.42 * Math.max(it.sx ?? 1, it.sz ?? 1) }));
+  stumpItems.forEach((it) => colliders.push({ x: it.x, z: it.z, r: 0.5 }));
+
   scene.add(group);
-  return { group, stats };
+  return { group, stats, colliders };
 }

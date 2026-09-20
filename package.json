@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "island-friends",
   "private": true,
   "version": "0.1.0",
@@ -12,6 +12,9 @@
     "audit": "node tools/audit.mjs",
     "test:input": "node tools/test-input.mjs",
     "test:trust": "node tools/test-trust.mjs",
+    "test:collision": "node tools/test-collision.mjs",
+    "test:camera": "node tools/test-camera.mjs",
+    "diagnose": "node tools/diagnose.mjs",
     "shoot:dog": "node tools/shoot-dog.mjs",
     "test:single": "node tools/test-single.mjs"
   },

@@ -8,6 +8,8 @@ export function buildStructures(scene, layout, assets, palette) {
   const group = new THREE.Group();
   group.name = 'structures';
   const blockers = [];
+  const walls = [];      // 院墙这类"矩形环"碰撞
+  const platforms = [];  // 能走上去的面（码头栈台）
   const nightLights = [];
   const stats = { houses: 0, yards: 0, props: 0, slabs: 0 };
 
@@ -106,6 +108,16 @@ export function buildStructures(scene, layout, assets, palette) {
     yard.position.set(pad.x, layout.heightAt(pad.x, pad.z), pad.z);
     yard.rotation.y = pad.rot ?? 0;
     group.add(yard);
+    // 院墙的碰撞：矩形环 + 门洞（人能进院子，但穿不过墙）
+    walls.push({
+      x: pad.x,
+      z: pad.z,
+      rot: pad.rot ?? 0,
+      halfW: fw / 2,
+      halfD: fd / 2,
+      thickness: 0.42,
+      gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }]
+    });
     stats.yards++;
   });
 
@@ -128,6 +140,7 @@ export function buildStructures(scene, layout, assets, palette) {
     rail.userData.audit = { kind: 'decor' };
     rail.position.set(bt.x, y, bt.z);
     group.add(rail);
+    walls.push({ x: bt.x, z: bt.z, rot: 0, halfW: 7.5, halfD: 7.5, thickness: 0.42, gaps: [{ x: 0, z: 7.5, r: 2.4 }] });
   }
 
   // ---------- 土地庙 + 庙前老榕树 ----------
@@ -184,6 +197,17 @@ export function buildStructures(scene, layout, assets, palette) {
     pier.userData.audit = { kind: 'landmark', tag: 'pier' };
     pier.rotation.y = Math.atan2(-dx, -dz);
     pier.position.set(px, py, pz);
+    const deck = pier.userData.deckLocal ?? { cx: 0, cz: -6, halfW: 1.5, halfD: 5 };
+    platforms.push({
+      x: px,
+      z: pz,
+      rot: pier.rotation.y,
+      cx: deck.cx,
+      cz: deck.cz,
+      halfW: deck.halfW,
+      halfD: deck.halfD,
+      topY: py + (pier.userData.deckTopY ?? 1.15)
+    });
     group.add(pier);
     stats.props++;
 
@@ -287,6 +311,17 @@ export function buildStructures(scene, layout, assets, palette) {
       }
       occupied.push({ x, z, r: myR, name: opts.name });
       if (opts.blockerRadius) blockers.push({ x, z, r: opts.blockerRadius, h: y + (opts.blockerHeight ?? 2.2) });
+      // 立柱类道具（晾衣绳的两根杆子）单独加碰撞
+      for (const [lx, lz] of opts.posts ?? []) {
+        const c = Math.cos(item.rot ?? 0);
+        const sn = Math.sin(item.rot ?? 0);
+        blockers.push({
+          x: x + lx * c + lz * sn,
+          z: z - lx * sn + lz * c,
+          r: opts.postRadius ?? 0.25,
+          h: y + (opts.blockerHeight ?? 2.4)
+        });
+      }
       stats.props++;
     }
   };
@@ -299,7 +334,7 @@ export function buildStructures(scene, layout, assets, palette) {
   place(assets.makeBarrel, P.barrels, { name: '木桶', blockerRadius: 0.55, radius: 0.7 });
   place(assets.makeStoneBench, P.benches, { name: '石凳', blockerRadius: 1.0, radius: 1.1 });
   place(assets.makeLanternPost, P.lanternPosts, { name: '灯笼路灯', blockerRadius: 0.3, blockerHeight: 3.4, radius: 0.8 });
-  place(assets.makeClothesline, P.clotheslines, { name: '晾衣绳', radius: 2.3 });
+  place(assets.makeClothesline, P.clotheslines, { name: '晾衣绳', radius: 2.3, posts: [[-2.2, 0], [2.2, 0]], postRadius: 0.22 });
   place(assets.makeMailbox, P.mailboxes, { name: '信箱', blockerRadius: 0.35, radius: 0.6 });
   place(assets.makeNetRack, P.netRacks, { name: '晒渔网架', blockerRadius: 1.6, blockerHeight: 2.6, radius: 2.1 });
   place(() => assets.makeDryingRack(rand), P.dryingRacks, { name: '晒鱼干架', blockerRadius: 1.1, radius: 1.6 });
@@ -324,5 +359,5 @@ export function buildStructures(scene, layout, assets, palette) {
   }
 
   scene.add(group);
-  return { group, blockers, nightLights, stats };
+  return { group, blockers, walls, platforms, nightLights, stats };
 }

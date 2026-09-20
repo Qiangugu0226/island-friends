@@ -15,6 +15,7 @@ import { createCameraRig } from './core/camera.js';
 import { createHud } from './ui/hud.js';
 import { createAudit } from './dev/audit.js';
 import { createTextures } from './core/textures.js';
+import { createCollision } from './systems/collision.js';
 import { createBubbles } from './systems/bubbles.js';
 import { createClues } from './systems/clues.js';
 import { createAnimal } from './systems/animal-ai.js';
@@ -151,6 +152,18 @@ async function boot() {
     terrain.mesh.renderOrder = 20;
   }
 
+  // ---------- 碰撞系统（必须在创建玩家之前建好，否则玩家拿不到）----------
+  // 圆形：房子/道具/树/石头/树桩 · 院墙：矩形环 + 门洞 · 平台：码头栈台
+  const collision = createCollision({ cell: 8 });
+  for (const b of structures.blockers) collision.addCircle(b.x, b.z, b.r, { h: b.h });
+  for (const c of scatter.colliders) collision.addCircle(c.x, c.z, c.r);
+  for (const w of structures.walls) collision.walls.push(w);
+  for (const p of structures.platforms) collision.platforms.push(p);
+  cfg.player.collision = collision;
+  console.log(
+    `[collision] 圆形碰撞 ${collision.circles.length} 个 · 院墙 ${collision.walls.length} 段 · 平台 ${collision.platforms.length} 个`
+  );
+
   hud.setLoading('正在放置玩家…', 0.86);
   await nextFrame();
   const player = createPlayer(assets, palette, cfg.player, layout);
@@ -263,15 +276,8 @@ async function boot() {
       const pz = f.z + dir.z * t;
       let hit = py < layout.heightAt(px, pz) + 0.45;
       if (!hit) {
-        for (const b of blockers) {
-          if (b.h !== undefined && py > b.h) continue;
-          const dx = px - b.x;
-          const dz = pz - b.z;
-          if (dx * dx + dz * dz < (b.r + 0.45) ** 2) {
-            hit = true;
-            break;
-          }
-        }
+        const b = collision.hitCircle(px, pz, 0.45, py);
+        if (b) hit = true;
       }
       if (hit) return Math.max(1.3, t - 0.5);
     }
@@ -280,21 +286,18 @@ async function boot() {
 
   // 兜底：收最近了还在物件里（比如玩家贴着晒鱼干架站），就水平推开一点
   rig.setPostAdjust((pos) => {
-    for (const b of blockers) {
-      if (b.h !== undefined && pos.y > b.h) continue;
-      const dx = pos.x - b.x;
-      const dz = pos.z - b.z;
-      const d = Math.hypot(dx, dz);
-      const need = b.r + 0.4;
-      if (d < need) {
-        if (d < 1e-4) {
-          pos.x += need;
-        } else {
-          const k = (need - d) / d;
-          pos.x += dx * k;
-          pos.z += dz * k;
-        }
-      }
+    const b = collision.hitCircle(pos.x, pos.z, 0.4, pos.y);
+    if (!b) return;
+    const dx = pos.x - b.x;
+    const dz = pos.z - b.z;
+    const d = Math.hypot(dx, dz);
+    const need = b.r + 0.4;
+    if (d < 1e-4) {
+      pos.x += need;
+    } else {
+      const k = (need - d) / d;
+      pos.x += dx * k;
+      pos.z += dz * k;
     }
   });
 
@@ -589,6 +592,47 @@ async function boot() {
         .filter((p) => !p.taken)
         .map((p) => ({ food: p.food, x: +p.mesh.position.x.toFixed(1), z: +p.mesh.position.z.toFixed(1) })),
     groundAt: (x, z) => +layout.heightAt(x, z).toFixed(2),
+    collisionInfo: () => ({
+      circles: collision.circles.length,
+      walls: collision.walls.length,
+      platforms: collision.platforms.length
+    }),
+    circlesNear: (x, z, r = 10) =>
+      collision
+        .nearby(x, z, r)
+        .filter((b) => Math.hypot(b.x - x, b.z - z) <= r)
+        .slice(0, 12)
+        .map((b) => ({ x: +b.x.toFixed(1), z: +b.z.toFixed(1), r: +b.r.toFixed(2) })),
+    wallsList: () =>
+      collision.walls.map((w) => ({
+        x: +w.x.toFixed(1),
+        z: +w.z.toFixed(1),
+        rot: +(w.rot ?? 0).toFixed(3),
+        halfW: w.halfW,
+        halfD: w.halfD,
+        gaps: w.gaps ?? []
+      })),
+    platformsList: () =>
+      collision.platforms.map((p) => ({
+        x: +p.x.toFixed(1),
+        z: +p.z.toFixed(1),
+        rot: +p.rot.toFixed(3),
+        cx: p.cx,
+        cz: p.cz,
+        halfW: p.halfW,
+        halfD: p.halfD,
+        topY: +p.topY.toFixed(2)
+      })),
+    hitTest: (x, z) => {
+      const w = collision.hitWall(x, z);
+      const c = collision.hitCircle(x, z, 0.34, null);
+      return {
+        wall: !!w,
+        circle: c ? { x: +c.x.toFixed(1), z: +c.z.toFixed(1), r: +c.r.toFixed(2) } : null,
+        platform: collision.platformAt(x, z),
+        ground: +collision.groundAt(x, z, layout.heightAt).toFixed(2)
+      };
+    },
     blockersNear: (x, z, r = 8) =>
       blockers
         .map((b) => ({ ...b, d: +Math.hypot(b.x - x, b.z - z).toFixed(2) }))
