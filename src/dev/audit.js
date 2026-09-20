@@ -281,6 +281,30 @@ export function createAudit({ structures, layout, cfg }) {
               }
             }
           }
+          // 关键补充：上面的判定只用了"段元数据"。这里再量一遍**网格本身** ——
+          // 元数据说墙在这儿，网格被摆到别处（比如上下颠倒埋进土里）也必须报出来。
+          const bb0 = new THREE.Box3().setFromObject(child);
+          if (!bb0.isEmpty()) {
+            let lo = Infinity;
+            let hi = -Infinity;
+            for (const ws of wss) {
+              lo = Math.min(lo, ws.baseY0, ws.baseY1);
+              hi = Math.max(hi, ws.baseY0, ws.baseY1);
+            }
+            const expectHi = hi + (wss[0].height ?? 0.95);
+            const shift = Math.max(bb0.min.y - lo, lo - bb0.min.y);
+            const hiGap = expectHi - bb0.max.y; // 网格顶比该到的位置低多少
+            if (shift > 0.45 || hiGap > 0.45) {
+              const c = bb0.getCenter(new THREE.Vector3());
+              problems.push({
+                type: '墙网格错位',
+                name: `${item.name} · 网格与数据不一致`,
+                x: +c.x.toFixed(1),
+                z: +c.z.toFixed(1),
+                detail: `网格底 y=${bb0.min.y.toFixed(2)}，数据说应在 y≈${lo.toFixed(2)}；网格顶 y=${bb0.max.y.toFixed(2)}，应到 y≈${expectHi.toFixed(2)}`
+              });
+            }
+          }
           continue;
         }
         if (child.userData?.wallCap) continue; // 压顶石：按构造扣在墙身上（倾斜段的包围盒不可信）

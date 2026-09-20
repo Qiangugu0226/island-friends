@@ -8,25 +8,25 @@
     "radialReversals": 0
   },
   "walk": {
-    "maxStep": 0.5247856705360803,
-    "avg": 0.19867974940852262,
-    "spike": 0.32610592112755765,
-    "minClearance": 6.32,
+    "maxStep": 0.4216633728461578,
+    "avg": 0.1909812183422904,
+    "spike": 0.2306821545038674,
+    "minClearance": 6.8100000000000005,
     "insideSolid": 0,
     "radialReversals": 0
   },
   "spin": {
-    "maxStep": 8.783996812385578,
-    "avg": 0.9042933600127879,
-    "spike": 7.87970345237279,
+    "maxStep": 8.722396459689273,
+    "avg": 0.8874241140034125,
+    "spike": 7.834972345685861,
     "minClearance": 1.87,
     "insideSolid": 0,
-    "radialReversals": 2
+    "radialReversals": 1
   },
   "circle": {
     "maxStep": 4.317707725170848,
-    "avg": 0.41888629100194447,
-    "spike": 3.898821434168904,
+    "avg": 0.42025912374634944,
+    "spike": 3.897448601424499,
     "minClearance": 1.4500000000000002,
     "insideSolid": 0,
     "radialReversals": 7
@@ -54,13 +54,13 @@
     },
     {
       "pitch": -22,
-      "clear": 0.68,
-      "dist": 3.9
+      "clear": 0.69,
+      "dist": 3.96
     },
     {
       "pitch": -30,
-      "clear": 0.64,
-      "dist": 4.01
+      "clear": 0.67,
+      "dist": 3.9
     }
   ]
 }

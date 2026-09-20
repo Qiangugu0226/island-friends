@@ -38,7 +38,12 @@ async function boot() {
   const palette = cfg.palette;
 
   // ---------- 渲染器 / 场景 / 相机 ----------
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  // ?preserve=1：保留绘制缓冲，让自动化工具能 readPixels 逐像素核对画面（调试用，正常玩不需要）
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: 'high-performance',
+    preserveDrawingBuffer: params.get('preserve') === '1'
+  });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
@@ -595,6 +600,12 @@ async function boot() {
         .map((p) => ({ food: p.food, x: +p.mesh.position.x.toFixed(1), z: +p.mesh.position.z.toFixed(1) })),
     groundAt: (x, z) => +layout.heightAt(x, z).toFixed(2),
     heightAtExact: (x, z) => layout.heightAt(x, z),
+    // 世界坐标 → 屏幕像素（调试/自动出图用：把某个物件投到画面上看它在哪）
+    screenOf: (x, y, z) => {
+      const v = new THREE.Vector3(x, y, z).project(camera);
+      const r = renderer.domElement.getBoundingClientRect();
+      return [((v.x + 1) / 2) * r.width, ((1 - v.y) / 2) * r.height, +v.z.toFixed(3)];
+    },
     wallGates: () => (structures.gates ?? []).map((g) => ({ x: +g.x.toFixed(1), z: +g.z.toFixed(1), r: g.r })),
     collisionInfo: () => ({
       circles: collision.circles.length,

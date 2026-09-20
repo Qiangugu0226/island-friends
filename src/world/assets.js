@@ -326,8 +326,10 @@ export function createAssets(palette, textures) {
         const fx = (bx - ax) / len;
         const fz = (bz - az) / len;
         const xAxis = new THREE.Vector3(bx - ax, y1 - y0, bz - az).normalize();
-        const zAxis = new THREE.Vector3(fz, 0, -fx); // 墙面法线（水平）
-        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis); // 段的"上"
+        // 墙面法线（水平）。取 (-fz,0,fx) 而不是 (fz,0,-fx)：这样 cross(zAxis,xAxis) 的 Y 分量为 +1，
+        // 段的"上"才真的朝上。（取反了的话整段墙会被摆到地面以下 → 全部埋进土里看不见）
+        const zAxis = new THREE.Vector3(-fz, 0, fx);
+        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis); // 段的"上"，Y 分量为正
         const quat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
         const bottomMid = new THREE.Vector3((ax + bx) / 2, (y0 + y1) / 2 - SINK, (az + bz) / 2);
         // 段与段只是"同一材料的盒子"，最后会合成一个几何体再进场景：
