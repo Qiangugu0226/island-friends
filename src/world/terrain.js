@@ -3,7 +3,8 @@ import { makeNoise2D } from '../core/rng.js';
 import { clamp, smoothstep } from '../core/rng.js';
 
 // 低多边形岛屿地形：逐面单色（非索引几何）= 参考图那种干净硬边切面
-export function createTerrain(layout, palette) {
+// P5-1：叠加一层程序化"手绘色斑"贴图（map 与顶点色相乘），让大片草地不再死平
+export function createTerrain(layout, palette, textures) {
   const island = layout.island;
   const size = island.size;
   const res = island.resolution;
@@ -58,6 +59,9 @@ export function createTerrain(layout, palette) {
     return scratch;
   }
 
+  const uvs = new Float32Array(res * res * 6 * 2);
+  let t2 = 0;
+
   function pushVertex(px, py, pz, col) {
     positions[o++] = px;
     positions[o++] = py;
@@ -65,6 +69,9 @@ export function createTerrain(layout, palette) {
     colors[c++] = col.r;
     colors[c++] = col.g;
     colors[c++] = col.b;
+    // UV 铺满整张地形（贴图自身的 repeat 决定平铺密度）
+    uvs[t2++] = (px + half) / size;
+    uvs[t2++] = (pz + half) / size;
   }
 
   for (let j = 0; j < res; j++) {
@@ -109,10 +116,13 @@ export function createTerrain(layout, palette) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geo.computeVertexNormals();
   geo.computeBoundingSphere();
 
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  const matOpts = { vertexColors: true, flatShading: true };
+  if (textures?.ground) matOpts.map = textures.ground;
+  const mat = new THREE.MeshLambertMaterial(matOpts);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'terrain';
   mesh.receiveShadow = true;

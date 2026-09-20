@@ -15,10 +15,34 @@ export function flatMat(color, opts = {}) {
 export function makeMatCache() {
   const cache = new Map();
   return (color, opts = {}) => {
-    const key = color + JSON.stringify(opts);
+    const { map, ...rest } = opts;
+    const key = `${color}|${JSON.stringify(rest)}${map ? `|m:${map.uuid}` : ''}`;
     if (!cache.has(key)) cache.set(key, flatMat(color, opts));
     return cache.get(key);
   };
+}
+
+// 带 UV 的三角面几何（贴图用）
+export function geomFromTrisUV(tris, uvOf) {
+  const positions = new Float32Array(tris.length * 9);
+  const uvs = new Float32Array(tris.length * 6);
+  let o = 0;
+  let u = 0;
+  for (const tri of tris) {
+    for (const v of tri) {
+      positions[o++] = v[0];
+      positions[o++] = v[1];
+      positions[o++] = v[2];
+      const uv = uvOf(v);
+      uvs[u++] = uv[0];
+      uvs[u++] = uv[1];
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 // ---------- 几何工具 ----------
@@ -49,6 +73,7 @@ export function quad(a, b, c, d) {
 
 // 人字形屋顶（三角柱）：宽 w、高 h、进深 d，原点在底面中心
 // 注意绕序：坡面法线必须朝外（朝上/朝外），否则会被自己的阴影压黑
+// 同时生成 UV：u 沿屋脊方向、v 沿坡面方向 —— 这样瓦垄贴图才会顺着坡走
 export function gableRoofGeometry(w, h, d, overhang = 0.35) {
   const hw = w / 2 + overhang;
   const hd = d / 2 + overhang;
@@ -64,7 +89,11 @@ export function gableRoofGeometry(w, h, d, overhang = 0.35) {
   t.push([A, B2, B], [A, A2, B2]); // 底面
   t.push([A, B, C]); // 前山墙
   t.push([A2, C2, B2]); // 后山墙
-  return geomFromTris(t);
+  const uvOf = (p) => {
+    const slope = Math.sqrt((hw - Math.abs(p[0])) ** 2 + p[1] ** 2);
+    return [p[2] * 0.55 + 0.5, slope * 0.55];
+  };
+  return geomFromTrisUV(t, uvOf);
 }
 
 // 三角柱（山墙/尖顶用）

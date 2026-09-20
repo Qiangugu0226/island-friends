@@ -1,41 +1,41 @@
 {
   "idle": {
-    "maxStep": 0.022360679774998216,
-    "avg": 0.002276551294565112,
-    "spike": 0.020084128480433103,
+    "maxStep": 0.014142135623729393,
+    "avg": 0.001484440679292641,
+    "spike": 0.012657694944436752,
     "minClearance": 7.180000000000001,
     "insideSolid": 0,
     "radialReversals": 0
   },
   "walk": {
-    "maxStep": 0.5327288240746867,
-    "avg": 0.23868441452774988,
-    "spike": 0.2940444095469368,
+    "maxStep": 0.531883445878891,
+    "avg": 0.21546475087744574,
+    "spike": 0.31641869500144526,
     "minClearance": 6.33,
     "insideSolid": 0,
     "radialReversals": 0
   },
   "spin": {
-    "maxStep": 8.71860654003838,
-    "avg": 0.8689200099306859,
-    "spike": 7.849686530107694,
-    "minClearance": 1.88,
+    "maxStep": 8.732771610433884,
+    "avg": 0.8286261750287383,
+    "spike": 7.904145435405146,
+    "minClearance": 1.8900000000000006,
     "insideSolid": 0,
     "radialReversals": 1
   },
   "circle": {
-    "maxStep": 5.743082795851023,
-    "avg": 0.5993181993384551,
-    "spike": 5.143764596512567,
-    "minClearance": 1.4500000000000002,
+    "maxStep": 5.47900538419155,
+    "avg": 0.5610680212833872,
+    "spike": 4.917937362908162,
+    "minClearance": 1.46,
     "insideSolid": 0,
     "radialReversals": 8
   },
   "look": [
     {
       "pitch": 30,
-      "clear": 4.29,
-      "dist": 6.62
+      "clear": 4.58,
+      "dist": 7.22
     },
     {
       "pitch": 12,
@@ -50,17 +50,17 @@
     {
       "pitch": -12,
       "clear": 0.7,
-      "dist": 4.25
+      "dist": 4.02
     },
     {
       "pitch": -22,
-      "clear": 0.69,
-      "dist": 3.96
+      "clear": 0.71,
+      "dist": 3.9
     },
     {
       "pitch": -30,
-      "clear": 0.64,
-      "dist": 4.01
+      "clear": 0.66,
+      "dist": 3.96
     }
   ]
 }

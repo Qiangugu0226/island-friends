@@ -1,11 +1,49 @@
 import * as THREE from 'three';
 import { makeMatCache, gableRoofGeometry, shade, mergeParts, palmCrownGeometry } from '../core/materials.js';
+import { withRepeat } from '../core/textures.js';
 
-// 全部资产都是代码生成的几何体：低多边形 + flatShading
+// 全部资产都是代码生成的几何体：低多边形 + flatShading + 程序化手绘贴图
 // 造型体系 = 中国东南沿海渔村（石厝 / 燕尾脊 / 航标塔 / 土地庙 / 石阶码头 / 渔网 / 榕树芭蕉竹丛）
 // 配色体系 = 参考图 Explore! Piggy Island 的暖奶油 + 青绿 + 黄绿（童话化处理）
-export function createAssets(palette) {
-  const mat = makeMatCache();
+// P5-1：贴图按「颜色 → 贴图」自动挂载（颜色继续负责染色，一张瓦垄贴图可同时给灰瓦/红瓦用）
+export function createAssets(palette, textures) {
+  const baseMat = makeMatCache();
+  const T = textures ?? {};
+
+  const stoneMain = T.stone ? withRepeat(T.stone, 3.4, 2.2) : null;
+  const stoneFine = T.stone ? withRepeat(T.stone, 3.2, 1.2) : null;
+  const woodMain = T.wood ? withRepeat(T.wood, 1.6, 1.6) : null;
+  const woodCoarse = T.wood ? withRepeat(T.wood, 1.1, 1.1) : null;
+  const texMap = {
+    [palette.wallStone]: stoneMain,
+    [palette.wallStoneAlt]: stoneMain,
+    [palette.wallBrick]: T.brick ?? null,
+    [palette.wallBrickDark]: T.brick ?? null,
+    [palette.wallWhite]: T.plaster ?? null,
+    [palette.roofTile]: T.roofTiles ?? null,
+    [palette.roofTileDark]: T.roofTiles ?? null,
+    [palette.roofRed]: T.roofTiles ?? null,
+    [palette.wood]: woodMain,
+    [palette.woodDark]: woodCoarse,
+    [palette.timber]: woodMain,
+    [palette.timberDark]: woodCoarse,
+    [palette.stone]: stoneFine,
+    [palette.stoneDark]: stoneFine,
+    [palette.foundation]: stoneFine,
+    '#E0BC63': T.thatch ?? null,
+    '#CFA94F': T.thatch ?? null
+  };
+
+  const mat = (color, opts = {}) => {
+    if (opts.noTex) {
+      const rest = { ...opts };
+      delete rest.noTex;
+      return baseMat(color, rest);
+    }
+    if (opts.map) return baseMat(color, opts);
+    const m = texMap[color];
+    return m ? baseMat(color, { ...opts, map: m }) : baseMat(color, opts);
+  };
 
   // ---------- 几何缓存 ----------
   const trunkGeo = new THREE.CylinderGeometry(0.15, 0.24, 2.4, 6);
@@ -904,6 +942,7 @@ export function createAssets(palette) {
 
   return {
     mat,
+    textures: T,
     geos: {
       trunkGeo,
       canopyRound,

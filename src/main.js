@@ -14,6 +14,7 @@ import { createInput } from './core/input.js';
 import { createCameraRig } from './core/camera.js';
 import { createHud } from './ui/hud.js';
 import { createAudit } from './dev/audit.js';
+import { createTextures } from './core/textures.js';
 import { createBubbles } from './systems/bubbles.js';
 import { createClues } from './systems/clues.js';
 import { createAnimal } from './systems/animal-ai.js';
@@ -66,8 +67,9 @@ async function boot() {
   await nextFrame();
 
   const layout = buildLayout(cfg);
-  const assets = createAssets(palette);
-  const terrain = createTerrain(layout, palette);
+  const textures = createTextures(palette, cfg.seed);
+  const assets = createAssets(palette, textures);
+  const terrain = createTerrain(layout, palette, textures);
   scene.add(terrain.mesh);
   const tBoot = performance.now();
   const mark = (label) => {
