@@ -594,6 +594,8 @@ async function boot() {
         .filter((p) => !p.taken)
         .map((p) => ({ food: p.food, x: +p.mesh.position.x.toFixed(1), z: +p.mesh.position.z.toFixed(1) })),
     groundAt: (x, z) => +layout.heightAt(x, z).toFixed(2),
+    heightAtExact: (x, z) => layout.heightAt(x, z),
+    wallGates: () => (structures.gates ?? []).map((g) => ({ x: +g.x.toFixed(1), z: +g.z.toFixed(1), r: g.r })),
     collisionInfo: () => ({
       circles: collision.circles.length,
       walls: collision.walls.length,
@@ -607,13 +609,77 @@ async function boot() {
         .map((b) => ({ x: +b.x.toFixed(1), z: +b.z.toFixed(1), r: +b.r.toFixed(2) })),
     wallsList: () =>
       collision.walls.map((w) => ({
-        x: +w.x.toFixed(1),
-        z: +w.z.toFixed(1),
-        rot: +(w.rot ?? 0).toFixed(3),
-        halfW: w.halfW,
-        halfD: w.halfD,
-        gaps: w.gaps ?? []
+        ax: +w.ax.toFixed(2),
+        az: +w.az.toFixed(2),
+        bx: +w.bx.toFixed(2),
+        bz: +w.bz.toFixed(2),
+        thickness: w.thickness,
+        baseY: w.baseY === undefined ? null : +w.baseY.toFixed(3),
+        baseY0: w.baseY0 === undefined ? null : +w.baseY0.toFixed(3),
+        baseY1: w.baseY1 === undefined ? null : +w.baseY1.toFixed(3),
+        height: w.height ?? null
       })),
+    // 院墙形状体检：走向分布（方框=只有 2 个方向）+ 每段是否贴地
+    wallStats: () => {
+      const segs = collision.walls;
+      const bins = new Array(18).fill(0);
+      let maxFloat = 0;
+      let worst = null;
+      for (const s of segs) {
+        const ang = ((Math.atan2(s.bz - s.az, s.bx - s.ax) * 180) / Math.PI + 180) % 180;
+        bins[Math.floor(ang / 10) % 18] += 1;
+        if (s.baseY !== null && s.baseY !== undefined) {
+          for (const [px, pz] of [[s.ax, s.az], [s.bx, s.bz]]) {
+            const g = layout.heightAt(px, pz);
+            const gap = s.baseY - g; // >0 = 墙底高于地面 → 悬空
+            if (gap > maxFloat) {
+              maxFloat = gap;
+              worst = [+px.toFixed(1), +pz.toFixed(1)];
+            }
+          }
+        }
+      }
+      const occupied = bins.filter((b) => b > 0).length;
+      const top = Math.max(...bins);
+      return {
+        segs: segs.length,
+        dirBins: occupied,
+        topBinShare: +(top / Math.max(1, segs.length)).toFixed(2),
+        maxBottomGap: +maxFloat.toFixed(3),
+        worstAt: worst
+      };
+    },
+    // 院墙统计：按连通性把墙段聚成"圈"，方便判断有几座院子
+    wallGroups: () => {
+      const segs = collision.walls;
+      const n = segs.length;
+      const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 2.0;
+      const seen = new Array(n).fill(false);
+      let groups = 0;
+      const sizes = [];
+      for (let i = 0; i < n; i++) {
+        if (seen[i]) continue;
+        groups += 1;
+        let count = 0;
+        const stack = [i];
+        seen[i] = true;
+        while (stack.length) {
+          const k = stack.pop();
+          count += 1;
+          const s = segs[k];
+          for (let j = 0; j < n; j++) {
+            if (seen[j]) continue;
+            const t = segs[j];
+            if (near([s.ax, s.az], [t.ax, t.az]) || near([s.ax, s.az], [t.bx, t.bz]) || near([s.bx, s.bz], [t.ax, t.az]) || near([s.bx, s.bz], [t.bx, t.bz])) {
+              seen[j] = true;
+              stack.push(j);
+            }
+          }
+        }
+        sizes.push(count);
+      }
+      return { groups, sizes: sizes.sort((a, b) => b - a) };
+    },
     platformsList: () =>
       collision.platforms.map((p) => ({
         x: +p.x.toFixed(1),

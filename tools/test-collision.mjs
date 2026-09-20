@@ -34,40 +34,54 @@ console.log(`碰撞体：圆形 ${info.circles} 个 · 院墙 ${info.walls} 段 
 
 // ---------- 1. 院墙：墙身挡住、门洞能进 ----------
 const walls = await ev(() => window.__island.wallsList());
-check('院墙有碰撞段', walls.length >= 4, `${walls.length} 段（4 栋石厝 + 航标塔围栏）`);
-// 取第一栋石厝的院墙，测"墙身中点"和"门洞中点"
-const w0 = walls[0];
-const rot = w0.rot;
-const cos = Math.cos(rot);
-const sin = Math.sin(rot);
-const localToWorld = (lx, lz) => [w0.x + lx * cos + lz * sin, w0.z - lx * sin + lz * cos];
-const [wallX, wallZ] = localToWorld(-w0.halfW, 0); // 西侧墙身
-const gap = (w0.gaps && w0.gaps[0]) || { x: 0, z: w0.halfD };
-const [gateX, gateZ] = localToWorld(gap.x, gap.z);
-const tWall = await ev(([x, z]) => window.__island.hitTest(x, z), [wallX, wallZ]);
-const tGate = await ev(([x, z]) => window.__island.hitTest(x, z), [gateX, gateZ]);
-check('院墙墙身会挡住玩家', tWall.wall === true, `点(${wallX.toFixed(1)},${wallZ.toFixed(1)}) wall=${tWall.wall}`);
-check('院墙门洞可以进出', tGate.wall === false, `门洞(${gateX.toFixed(1)},${gateZ.toFixed(1)}) wall=${tGate.wall}`);
+const groups = await ev(() => window.__island.wallGroups());
+check('院墙有碰撞段', walls.length >= 20, `${walls.length} 段，聚成 ${groups.groups} 个圈（尺寸 ${groups.sizes.join('/')}）`);
+check('院墙是曲线（不是 4 段矩形）', groups.sizes.every((s) => s >= 8), `每个圈最少 ${Math.min(...groups.sizes)} 段`);
 
-// 实际走过去：从院外朝墙走 2.5 秒，应该被挡住（不能穿到墙的另一侧）
-const [outsideX, outsideZ] = localToWorld(-w0.halfW - 3, 0);
-await ev(([x, z]) => window.__island.teleport(x, z), [outsideX, outsideZ]);
+// 取一段"离门洞最远"的墙：门口本来就能过，选到那儿测穿墙会误判
+const gates = await ev(() => window.__island.wallGates());
+const gateDist = (s) => {
+  const mx = (s.ax + s.bx) / 2;
+  const mz = (s.az + s.bz) / 2;
+  return Math.min(...gates.map((g) => Math.hypot(mx - g.x, mz - g.z) - g.r));
+};
+const w0 = [...walls].sort((a, b) => gateDist(b) - gateDist(a))[0];
+const mx = (w0.ax + w0.bx) / 2;
+const mz = (w0.az + w0.bz) / 2;
+const dirX = (w0.bx - w0.ax) / Math.max(1e-6, Math.hypot(w0.bx - w0.ax, w0.bz - w0.az));
+const dirZ = (w0.bz - w0.az) / Math.max(1e-6, Math.hypot(w0.bx - w0.ax, w0.bz - w0.az));
+const perpX = -dirZ;
+const perpZ = dirX;
+const tWall = await ev(([x, z]) => window.__island.hitTest(x, z), [mx, mz]);
+check('院墙墙身会挡住玩家', tWall.wall === true, `墙段中点(${mx.toFixed(1)},${mz.toFixed(1)}) wall=${tWall.wall}`);
+const outX = mx + perpX * 1.2;
+const outZ = mz + perpZ * 1.2;
+const tOut = await ev(([x, z]) => window.__island.hitTest(x, z), [outX, outZ]);
+check('墙外 1.2m 可通行（墙是薄带）', tOut.wall === false, `(${outX.toFixed(1)},${outZ.toFixed(1)}) wall=${tOut.wall}`);
+
+// 实际走过去：从墙外 3m 朝墙走 2.6 秒，应该被挡在外面（不能穿到墙内侧）
+const startX = mx + perpX * 3;
+const startZ = mz + perpZ * 3;
+await ev(([x, z]) => window.__island.teleport(x, z), [startX, startZ]);
 await delay(400);
-await ev(([x, z]) => {
-  // 面朝墙的方向：用相机朝向对准墙
-  const dx = x - 0, dz = 0;
-  void dx; void dz;
-}, [wallX, wallZ]);
 const yawTo = (from, to) => (Math.atan2(from[0] - to[0], from[1] - to[1]) * 180) / Math.PI;
-await ev((y) => window.__island.setYaw(y), yawTo([outsideX, outsideZ], [wallX, wallZ]));
+await ev((y) => window.__island.setYaw(y), yawTo([startX, startZ], [mx, mz]));
 await delay(600);
 await page.keyboard.down('KeyW');
 await delay(2600);
 await page.keyboard.up('KeyW');
 const after = await ev(() => window.__island.pos());
-const distIn = await ev(([x, z]) => window.__island.hitTest(x, z), [after[0], after[2]]);
-const passThrough = distIn.wall === true && Math.hypot(after[0] - w0.x, after[2] - w0.z) < w0.halfW - 0.5;
-check('朝院墙走不会穿过去', !passThrough, `停在 (${after[0].toFixed(1)}, ${after[2].toFixed(1)})，离院心 ${Math.hypot(after[0] - w0.x, after[2] - w0.z).toFixed(1)}m`);
+// 是否跨到了墙的另一侧：比较相对墙段的垂直侧向位移
+const sideNow = (after[0] - mx) * perpX + (after[2] - mz) * perpZ;
+check('朝院墙走不会穿过去', sideNow > 0, `停在 (${after[0].toFixed(1)}, ${after[2].toFixed(1)})，侧向 ${sideNow.toFixed(2)}m（>0 = 仍在出发侧）`);
+
+// 每个门洞都真的能过（曲线院墙上的门是算出来的，必须验证没被墙段堵住）
+let openGates = 0;
+for (const g of gates) {
+  const t = await ev(([x, z]) => window.__island.hitTest(x, z), [g.x, g.z]);
+  if (t.wall === false) openGates += 1;
+}
+check('每个门洞都能过', openGates === gates.length, `${openGates}/${gates.length} 个门洞畅通`);
 
 // ---------- 2. 树 / 石头 / 树桩 / 晾衣杆 ----------
 const treeSpot = await ev(([x, z]) => window.__island.circlesNear(x, z, 12), [-6, -14]);

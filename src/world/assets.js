@@ -242,6 +242,120 @@ export function createAssets(palette, textures) {
     return shade(g);
   }
 
+  // ---------- 沿任意曲线摆石墙（院墙 / 围栏）----------
+  // points 是世界坐标的折线（会首尾相接）；每段墙各自贴合地形、并转向对准走向。
+  // 这样院墙就可以是"顺着地形围出来的曲线"，而不是死板的矩形。
+  function makeStoneWallPath(points, opts = {}) {
+    const g = new THREE.Group();
+    const h = opts.height ?? 0.95;
+    const t = opts.thickness ?? 0.42;
+    const groundAt = opts.groundAt ?? (() => opts.baseY ?? 0);
+    const gaps = opts.gaps ?? []; // 世界坐标的缺口（门口）{x,z,r}
+    const SINK = opts.sink ?? 0.14;
+    const step = opts.step ?? 1.2;
+    const wallMat = mat(opts.color ?? palette.wallStone);
+    const capMat = mat(opts.capColor ?? palette.stoneDark);
+    const bodyGeo = new THREE.BoxGeometry(1, h, t);
+    const capGeo = new THREE.BoxGeometry(1, 0.12, t + 0.14);
+    const wallSegs = [];
+    const bodyParts = [];
+    const capParts = [];
+
+    const inGap = (x, z) => gaps.some((gp) => (x - gp.x) ** 2 + (z - gp.z) ** 2 < (gp.r ?? 2.4) ** 2);
+
+    const pts = opts.closed === false ? points : [...points, points[0]];
+    // 自适应分段：先沿边密集采地形，再贪心合并成"尽可能长、但始终贴着地面"的墙段。
+    // 平地 → 一段约 1.2m（省面数）；陡坡/崖边 → 自动切成更短的段（不会陷进土里）。
+    const FIT = opts.fitTol ?? 0.18; // 段内地面允许偏离"段底直线"的最大值
+    const MAXDROP = opts.maxDrop ?? 0.42; // 单段允许的总高差
+    const DENSE = 0.4; // 地形采样间距
+    const lerp = (a, b, k) => a + (b - a) * k;
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x0, z0] = pts[i];
+      const [x1, z1] = pts[i + 1];
+      const segLen = Math.hypot(x1 - x0, z1 - z0);
+      if (segLen < 0.05) continue;
+      const dense = Math.max(1, Math.round(segLen / DENSE));
+      const ys = [];
+      for (let m = 0; m <= dense; m++) {
+        ys.push(groundAt(lerp(x0, x1, m / dense), lerp(z0, z1, m / dense)));
+      }
+      const perStep = Math.max(1, Math.round(step / (segLen / dense)));
+      let i0 = 0;
+      while (i0 < dense) {
+        let i1 = Math.min(dense, i0 + perStep);
+        const maxSteps = Math.max(1, Math.round((step * (opts.maxSegFactor ?? 1.8)) / (segLen / dense)));
+        // 在不"浮空"的前提下尽量把段拉长（但有上限，否则整圈墙会变成几块大石头）
+        while (i1 < dense && i1 - i0 < maxSteps) {
+          const j = i1 + 1;
+          const span = j - i0;
+          const ya = ys[i0];
+          const yb = ys[j];
+          let dev = 0;
+          for (let m = i0; m <= j; m++) dev = Math.max(dev, Math.abs(ys[m] - lerp(ya, yb, (m - i0) / span)));
+          if (dev > FIT || Math.abs(yb - ya) > MAXDROP) break;
+          i1 = j;
+        }
+        // 若连最小段都贴不住（陡坎），继续切短
+        while (i1 > i0 + 1) {
+          const span = i1 - i0;
+          const ya = ys[i0];
+          const yb = ys[i1];
+          let dev = 0;
+          for (let m = i0; m <= i1; m++) dev = Math.max(dev, Math.abs(ys[m] - lerp(ya, yb, (m - i0) / span)));
+          if (dev <= FIT && Math.abs(yb - ya) <= MAXDROP) break;
+          i1 -= 1;
+        }
+        const t0 = i0 / dense;
+        const t1 = i1 / dense;
+        const ax = lerp(x0, x1, t0);
+        const az = lerp(z0, z1, t0);
+        const bx = lerp(x0, x1, t1);
+        const bz = lerp(z0, z1, t1);
+        const mx = (ax + bx) / 2;
+        const mz = (az + bz) / 2;
+        i0 = i1;
+        if (inGap(mx, mz)) continue;
+        const len = Math.hypot(bx - ax, bz - az);
+        const y0 = ys[Math.round(t0 * dense)];
+        const y1 = ys[Math.round(t1 * dense)];
+        // 让墙段顺着坡度倾斜（而不是垂直往下埋）：
+        // 段底面沿墙走向从 (ax,y0) 连到 (bx,y1)，段与段首尾共用同一个点，
+        // 所以整圈墙是"折线贴地"，既没有一头悬空，也不会在陡坡上整段陷没。
+        const fx = (bx - ax) / len;
+        const fz = (bz - az) / len;
+        const xAxis = new THREE.Vector3(bx - ax, y1 - y0, bz - az).normalize();
+        const zAxis = new THREE.Vector3(fz, 0, -fx); // 墙面法线（水平）
+        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis); // 段的"上"
+        const quat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
+        const bottomMid = new THREE.Vector3((ax + bx) / 2, (y0 + y1) / 2 - SINK, (az + bz) / 2);
+        // 段与段只是"同一材料的盒子"，最后会合成一个几何体再进场景：
+        // 一圈 40 段如果各自一个 Mesh，就是 80 个 draw call——合并后整圈只要 2 个。
+        const eul = new THREE.Euler().setFromQuaternion(quat);
+        const rotArr = [eul.x, eul.y, eul.z];
+        const bodyPos = bottomMid.clone().addScaledVector(yAxis, h / 2);
+        const capPos = bottomMid.clone().addScaledVector(yAxis, h + 0.06);
+        bodyParts.push({ geo: bodyGeo, pos: [bodyPos.x, bodyPos.y, bodyPos.z], rot: rotArr, scale: [len * 1.04, 1, 1] });
+        capParts.push({ geo: capGeo, pos: [capPos.x, capPos.y, capPos.z], rot: rotArr, scale: [len * 1.04, 1, 1] });
+        wallSegs.push({ ax, az, bx, bz, thickness: t, baseY: bottomMid.y, baseY0: y0 - SINK, baseY1: y1 - SINK, height: h });
+      }
+    }
+    if (bodyParts.length) {
+      const bodyMesh = new THREE.Mesh(mergeParts(bodyParts), wallMat);
+      bodyMesh.name = 'wall-body';
+      // 供 audit / 调试工具精确核对"这一段有没有浮空"（包围盒判断在斜段上不准）
+      bodyMesh.userData.wallSegs = wallSegs;
+      g.add(bodyMesh);
+      const capMesh = new THREE.Mesh(mergeParts(capParts), capMat);
+      capMesh.name = 'wall-cap';
+      capMesh.userData.wallCap = true;
+      g.add(capMesh);
+    }
+    g.userData.wallSegs = wallSegs;
+    return shade(g);
+  }
+
   // ---------- 石砌矮院墙（留门洞）----------
   // 关键：每一段各自贴合地形（不能用"院子中心一个高度"的刚性环，否则地形一有起伏整段就悬空）
   function makeStoneWallYard(w, d, opts = {}) {
@@ -1019,6 +1133,7 @@ export function createAssets(palette, textures) {
     makeGrassTuft,
     makeStoneHouse,
     makeStoneWallYard,
+    makeStoneWallPath,
     makeBeaconTower,
     makeShrine,
     makeStonePier,

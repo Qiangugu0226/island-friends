@@ -60,25 +60,18 @@ export function createCollision({ cell = 8 } = {}) {
     return null;
   }
 
-  // 院墙：落在"墙环"里且不在门洞 → 挡住
-  function hitWall(x, z, margin = 0.28) {
+  // 院墙：按"墙段（线段）"判定 —— 院墙现在是沿曲线摆的不规则墙，用线段最合适
+  function hitWall(x, z, margin = 0.26) {
     for (const w of walls) {
-      const c = Math.cos(w.rot ?? 0);
-      const s = Math.sin(w.rot ?? 0);
-      const dx = x - w.x;
-      const dz = z - w.z;
-      const lx = dx * c - dz * s;
-      const lz = dx * s + dz * c;
-      const ax = Math.abs(lx);
-      const az = Math.abs(lz);
-      const t = (w.thickness ?? 0.42) / 2 + margin;
-      const halfW = w.halfW;
-      const halfD = w.halfD;
-      const onX = Math.abs(ax - halfW) <= t && az <= halfD + t;
-      const onZ = Math.abs(az - halfD) <= t && ax <= halfW + t;
-      if (!onX && !onZ) continue;
-      const inGap = (w.gaps ?? []).some((g) => (lx - g.x) ** 2 + (lz - g.z) ** 2 < (g.r ?? 2.4) ** 2);
-      if (!inGap) return w;
+      const dx = w.bx - w.ax;
+      const dz = w.bz - w.az;
+      const len2 = dx * dx + dz * dz || 1e-6;
+      let tt = ((x - w.ax) * dx + (z - w.az) * dz) / len2;
+      tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+      const px = w.ax + dx * tt;
+      const pz = w.az + dz * tt;
+      const d = Math.hypot(x - px, z - pz);
+      if (d < (w.thickness ?? 0.42) / 2 + margin) return w;
     }
     return null;
   }

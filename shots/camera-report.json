@@ -9,27 +9,27 @@
   },
   "walk": {
     "maxStep": 0.5247856705360803,
-    "avg": 0.167747894143755,
-    "spike": 0.35703777639232526,
+    "avg": 0.19867974940852262,
+    "spike": 0.32610592112755765,
     "minClearance": 6.32,
     "insideSolid": 0,
     "radialReversals": 0
   },
   "spin": {
-    "maxStep": 8.789544925648881,
-    "avg": 0.8345863496507968,
-    "spike": 7.954958575998084,
-    "minClearance": 1.8599999999999994,
+    "maxStep": 8.783996812385578,
+    "avg": 0.9042933600127879,
+    "spike": 7.87970345237279,
+    "minClearance": 1.87,
     "insideSolid": 0,
-    "radialReversals": 1
+    "radialReversals": 2
   },
   "circle": {
-    "maxStep": 5.503689671484026,
-    "avg": 0.44715636698268907,
-    "spike": 5.056533304501337,
-    "minClearance": 1.4400000000000004,
+    "maxStep": 4.317707725170848,
+    "avg": 0.41888629100194447,
+    "spike": 3.898821434168904,
+    "minClearance": 1.4500000000000002,
     "insideSolid": 0,
-    "radialReversals": 9
+    "radialReversals": 7
   },
   "look": [
     {
@@ -54,13 +54,13 @@
     },
     {
       "pitch": -22,
-      "clear": 0.69,
-      "dist": 3.96
+      "clear": 0.68,
+      "dist": 3.9
     },
     {
       "pitch": -30,
-      "clear": 0.66,
-      "dist": 3.96
+      "clear": 0.64,
+      "dist": 4.01
     }
   ]
 }

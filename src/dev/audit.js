@@ -253,6 +253,37 @@ export function createAudit({ structures, layout, cfg }) {
       let worst = 0;
       let worstAt = null;
       for (const child of item.obj.children) {
+        // 院墙段：沿段底直线取样测地（包围盒在斜段上会误判）——浮空 >6cm 或埋深 >34cm 才算问题
+        // 一圈墙现在合并成一个网格，所以这里遍历的是"段列表"
+        const wss = child.userData?.wallSegs;
+        if (wss) {
+          for (const ws of wss) {
+            let float = 0;
+            let deep = 0;
+            let at = null;
+            for (let k = 0; k <= 8; k++) {
+              const t = k / 8;
+              const x = ws.ax + (ws.bx - ws.ax) * t;
+              const z = ws.az + (ws.bz - ws.az) * t;
+              const gap = ws.baseY0 + (ws.baseY1 - ws.baseY0) * t - layout.heightAt(x, z);
+              if (gap > float) {
+                float = gap;
+                at = [x, z];
+              }
+              if (-gap > deep) deep = -gap;
+            }
+            if (float > 0.06 || deep > 0.34) {
+              bad++;
+              const v = float > 0.06 ? float : -deep;
+              if (!worstAt || Math.abs(v) > Math.abs(worst)) {
+                worst = v;
+                worstAt = at;
+              }
+            }
+          }
+          continue;
+        }
+        if (child.userData?.wallCap) continue; // 压顶石：按构造扣在墙身上（倾斜段的包围盒不可信）
         const bb = new THREE.Box3().setFromObject(child);
         if (bb.isEmpty()) continue;
         // 压在别的零件上的（比如墙顶的压顶石）不算悬空
@@ -285,7 +316,7 @@ export function createAudit({ structures, layout, cfg }) {
           name: item.name,
           x: +worstAt[0].toFixed(1),
           z: +worstAt[1].toFixed(1),
-          detail: `${bad} 段没贴地（最大偏差 ${worst.toFixed(2)}m）`
+          detail: `${bad} 段没贴地（${worst > 0 ? `最严重浮空 ${worst.toFixed(2)}m` : `埋得最深 ${(-worst).toFixed(2)}m`}）`
         });
       }
     }
@@ -295,26 +326,21 @@ export function createAudit({ structures, layout, cfg }) {
     for (const it of items) {
       if (it.kind !== 'prop') continue;
       for (const wl of wallList) {
-        const c = Math.cos(wl.rot ?? 0);
-        const s = Math.sin(wl.rot ?? 0);
-        const dx = it.cx - wl.x;
-        const dz = it.cz - wl.z;
-        const lx = dx * c - dz * s;
-        const lz = dx * s + dz * c;
-        const ax = Math.abs(lx);
-        const az = Math.abs(lz);
-        const band = (wl.thickness ?? 0.42) / 2 + it.r * 0.6;
-        const onX = Math.abs(ax - wl.halfW) <= band && az <= wl.halfD + band;
-        const onZ = Math.abs(az - wl.halfD) <= band && ax <= wl.halfW + band;
-        if (!onX && !onZ) continue;
-        const inGap = (wl.gaps ?? []).some((gp) => (lx - gp.x) ** 2 + (lz - gp.z) ** 2 < (gp.r ?? 2.4) ** 2);
-        if (inGap) continue;
+        const dx = wl.bx - wl.ax;
+        const dz = wl.bz - wl.az;
+        const len2 = dx * dx + dz * dz || 1e-6;
+        let tt = ((it.cx - wl.ax) * dx + (it.cz - wl.az) * dz) / len2;
+        tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+        const px = wl.ax + dx * tt;
+        const pz = wl.az + dz * tt;
+        const d = Math.hypot(it.cx - px, it.cz - pz);
+        if (d >= (wl.thickness ?? 0.42) / 2 + it.r * 0.6) continue;
         problems.push({
           type: '道具插进院墙',
           name: it.name,
           x: +it.cx.toFixed(1),
           z: +it.cz.toFixed(1),
-          detail: `与院墙（${wl.x.toFixed(0)},${wl.z.toFixed(0)}）相交`
+          detail: `距墙 ${d.toFixed(2)}m`
         });
         break;
       }

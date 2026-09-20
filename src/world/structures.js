@@ -8,7 +8,8 @@ export function buildStructures(scene, layout, assets, palette) {
   const group = new THREE.Group();
   group.name = 'structures';
   const blockers = [];
-  const walls = [];      // 院墙这类"矩形环"碰撞
+  const walls = [];      // 院墙碰撞：每段一条线段 {ax,az,bx,bz,thickness}
+  const gates = [];      // 院墙/围栏上的缺口（门洞），供调试与自动测试判断"哪里本来就该能过"
   const platforms = [];  // 能走上去的面（码头栈台）
   const nightLights = [];
   const stats = { houses: 0, yards: 0, props: 0, slabs: 0 };
@@ -67,6 +68,36 @@ export function buildStructures(scene, layout, assets, palette) {
     stats.slabs = slabPositions.length;
   }
 
+  // 自然曲线轮廓：两三个低频正弦叠加（每个点独立随机会变成锯齿多边形，像折纸不像石墙）
+  // 另外：地面太陡的地方自动往里收一点——现实里砌墙也会绕开难砌的坡坎
+  function organicRing(cx, cz, rx, rz, rot, N, opts = {}) {
+    const amp = opts.amp ?? [0.11, 0.07, 0.04];
+    const freq = opts.freq ?? [2, 3, 5];
+    const phase = [rand() * Math.PI * 2, rand() * Math.PI * 2, rand() * Math.PI * 2];
+    const slopeLimit = opts.slopeLimit ?? 0.35;
+    const cosR = Math.cos(rot);
+    const sinR = Math.sin(rot);
+    const pts = [];
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      let wob = 1;
+      for (let k = 0; k < amp.length; k++) wob += Math.sin(a * freq[k] + phase[k]) * amp[k];
+      let shrink = 1;
+      let wx = cx;
+      let wz = cz;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const lx = Math.cos(a) * rx * wob * shrink;
+        const lz = Math.sin(a) * rz * wob * shrink;
+        wx = cx + lx * cosR + lz * sinR;
+        wz = cz - lx * sinR + lz * cosR;
+        if (layout.slopeAt(wx, wz) <= slopeLimit) break;
+        shrink -= 0.04;
+      }
+      pts.push([wx, wz]);
+    }
+    return pts;
+  }
+
   // ---------- 石厝小院 ----------
   layout.pads.forEach((pad) => {
     const house = assets.makeStoneHouse(rand, pad);
@@ -82,48 +113,34 @@ export function buildStructures(scene, layout, assets, palette) {
     });
     stats.houses++;
 
-    // 石砌矮院墙，朝村子中心留门
+    // 院墙：顺着地形围出**不规则曲线**（不是矩形），门开在朝村子中心那一侧
     const fw = pad.w + 5.4;
     const fd = pad.d + 5.4;
+    const outline = organicRing(pad.x, pad.z, fw / 2, fd / 2, pad.rot ?? 0, 28);
     const toCenter = new THREE.Vector2(-pad.x, -pad.z).normalize();
-    const localAngle = Math.atan2(toCenter.y, toCenter.x) - (pad.rot ?? 0);
-    const sides = [
-      { a: 0, gap: { x: fw / 2, z: 0 } },
-      { a: Math.PI / 2, gap: { x: 0, z: fd / 2 } },
-      { a: Math.PI, gap: { x: -fw / 2, z: 0 } },
-      { a: -Math.PI / 2, gap: { x: 0, z: -fd / 2 } }
-    ];
-    let best = sides[0];
-    let bestDiff = Infinity;
-    for (const s of sides) {
-      const diff = Math.abs(((localAngle - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        best = s;
+    let gateIndex = 0;
+    let bestDot = -Infinity;
+    outline.forEach(([px, pz], i) => {
+      const d = new THREE.Vector2(px - pad.x, pz - pad.z).normalize().dot(toCenter);
+      if (d > bestDot) {
+        bestDot = d;
+        gateIndex = i;
       }
-    }
-    const yard = assets.makeStoneWallYard(fw, fd, {
-      gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }],
-      originX: pad.x,
-      originZ: pad.z,
-      rot: pad.rot ?? 0,
-      groundAt: layout.heightAt
+    });
+    const gate = { x: outline[gateIndex][0], z: outline[gateIndex][1], r: 2.6 };
+    gates.push(gate);
+    const yard = assets.makeStoneWallPath(outline, {
+      gaps: [gate],
+      groundAt: layout.heightAt,
+      thickness: 0.42,
+      step: 1.0,
+      maxSegFactor: 1.3
     });
     yard.name = `院墙:${pad.id}`;
     yard.userData.audit = { kind: 'decor' };
-    yard.position.set(pad.x, 0, pad.z);
-    yard.rotation.y = pad.rot ?? 0;
     group.add(yard);
-    // 院墙的碰撞：矩形环 + 门洞（人能进院子，但穿不过墙）
-    walls.push({
-      x: pad.x,
-      z: pad.z,
-      rot: pad.rot ?? 0,
-      halfW: fw / 2,
-      halfD: fd / 2,
-      thickness: 0.42,
-      gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }]
-    });
+    // 碰撞：逐段墙（每段一条线段），人能进院子但穿不过墙
+    for (const seg of yard.userData.wallSegs ?? []) walls.push(seg);
     stats.yards++;
   });
 
@@ -141,19 +158,21 @@ export function buildStructures(scene, layout, assets, palette) {
     nightLights.push(tower.light);
     blockers.push({ x: bt.x, z: bt.z, r: 3.4, h: y + (bt.height ?? 14) + 2 });
 
-    const rail = assets.makeStoneWallYard(15, 15, {
+    // 塔院矮墙：同样用不规则曲线（朝路的 +z 侧留口）
+    const railGate = { x: bt.x, z: bt.z + 7.6, r: 2.4 };
+    const railPts = organicRing(bt.x, bt.z, 7.5, 7.5, 0, 24, { amp: [0.08, 0.05, 0.03], slopeLimit: 0.5 });
+    const rail = assets.makeStoneWallPath(railPts, {
       height: 0.8,
-      gaps: [{ x: 0, z: 7.5, r: 2.4 }],
-      originX: bt.x,
-      originZ: bt.z,
-      rot: 0,
-      groundAt: layout.heightAt
+      gaps: [railGate],
+      groundAt: layout.heightAt,
+      step: 1.0,
+      maxSegFactor: 1.4
     });
+    gates.push(railGate);
     rail.name = '塔院围墙';
     rail.userData.audit = { kind: 'decor' };
-    rail.position.set(bt.x, 0, bt.z);
     group.add(rail);
-    walls.push({ x: bt.x, z: bt.z, rot: 0, halfW: 7.5, halfD: 7.5, thickness: 0.42, gaps: [{ x: 0, z: 7.5, r: 2.4 }] });
+    for (const seg of rail.userData.wallSegs ?? []) walls.push(seg);
   }
 
   // ---------- 土地庙 + 庙前老榕树 ----------
@@ -276,22 +295,17 @@ export function buildStructures(scene, layout, assets, palette) {
   const onLandmark = (x, z, margin) =>
     layout.landmarkPads.some((p) => (x - p.x) ** 2 + (z - p.z) ** 2 < (p.padR * 0.5 + margin) ** 2);
 
+  // 院墙现在是逐段线段：点到线段的距离 < 半墙厚+余量 就算压墙
   const onWall = (x, z, margin) =>
     walls.some((wl) => {
-      const c = Math.cos(wl.rot ?? 0);
-      const s = Math.sin(wl.rot ?? 0);
-      const dx = x - wl.x;
-      const dz = z - wl.z;
-      const lx = dx * c - dz * s;
-      const lz = dx * s + dz * c;
-      const ax = Math.abs(lx);
-      const az = Math.abs(lz);
-      const tt = (wl.thickness ?? 0.42) / 2 + margin;
-      const onX = Math.abs(ax - wl.halfW) <= tt && az <= wl.halfD + tt;
-      const onZ = Math.abs(az - wl.halfD) <= tt && ax <= wl.halfW + tt;
-      if (!onX && !onZ) return false;
-      const inGap = (wl.gaps ?? []).some((gp) => (lx - gp.x) ** 2 + (lz - gp.z) ** 2 < (gp.r ?? 2.4) ** 2);
-      return !inGap;
+      const dx = wl.bx - wl.ax;
+      const dz = wl.bz - wl.az;
+      const len2 = dx * dx + dz * dz || 1e-6;
+      let tt = ((x - wl.ax) * dx + (z - wl.az) * dz) / len2;
+      tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+      const px = wl.ax + dx * tt;
+      const pz = wl.az + dz * tt;
+      return Math.hypot(x - px, z - pz) < (wl.thickness ?? 0.42) / 2 + margin;
     });
 
   function busy(px, pz, myR) {
@@ -391,5 +405,5 @@ export function buildStructures(scene, layout, assets, palette) {
   }
 
   scene.add(group);
-  return { group, blockers, walls, platforms, nightLights, stats };
+  return { group, blockers, walls, gates, platforms, nightLights, stats };
 }
