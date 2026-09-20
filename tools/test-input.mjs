@@ -1,4 +1,4 @@
-﻿// 操作测试：验证 WASD 方向是否正确（A 左 / D 右 / W 前 / S 后）
+// 操作测试：验证 WASD 方向是否正确（A 左 / D 右 / W 前 / S 后）
 // 用法：node tools/test-input.mjs      （自动选择开发服务器或单文件离线版）
 import { setTimeout as delay } from 'node:timers/promises';
 import puppeteer from 'puppeteer-core';

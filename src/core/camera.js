@@ -8,6 +8,7 @@ export function createCameraRig(camera, cfg, input) {
     yaw: Math.PI * 0.92,
     pitch: THREE.MathUtils.degToRad(cfg.pitchDeg ?? 40),
     distance: cfg.distance ?? 13.5,
+    currentDist: cfg.distance ?? 13.5,
     focus: new THREE.Vector3(),
     initialized: false,
     orbitTime: 0
@@ -18,6 +19,10 @@ export function createCameraRig(camera, cfg, input) {
   const forward = new THREE.Vector3();
   const right = new THREE.Vector3();
   const desired = new THREE.Vector3();
+  const dirV = new THREE.Vector3();
+  const focusTarget = new THREE.Vector3();
+  let collider = null;
+  let postAdjust = null;
 
   const modes = ['follow', 'top', 'ground', 'gallery'];
   const modeNames = { follow: '跟随', top: '全岛俯瞰', ground: '地面', gallery: '资产总览', free: '自由相机' };
@@ -41,21 +46,42 @@ export function createCameraRig(camera, cfg, input) {
   }
 
   function followStep(dt, targetPos) {
+    // 抬头（俯仰角为负）时把注视点也抬高：相机才不会一头扎进地面，
+    // 画面变成"下半是角色、上半是天空"，这才是抬头看天该有的样子。
+    const lift = 1.05 + Math.min(3.2, Math.max(0, -state.pitch) * 3.2);
     if (!state.initialized) {
       state.focus.copy(targetPos);
+      state.focus.y += lift;
       state.initialized = true;
     } else {
       const k = 1 - Math.exp(-(cfg.followLerp ?? 9) * dt);
-      state.focus.lerp(targetPos, k);
+      focusTarget.copy(targetPos);
+      focusTarget.y += lift;
+      state.focus.lerp(focusTarget, k);
     }
+
+    // 视线方向的单位向量（从焦点指向相机）
     const cp = Math.cos(state.pitch);
-    desired.set(
-      state.focus.x + Math.sin(state.yaw) * cp * state.distance,
-      state.focus.y + Math.sin(state.pitch) * state.distance,
-      state.focus.z + Math.cos(state.yaw) * cp * state.distance
-    );
-    camera.position.lerp(desired, 1 - Math.exp(-14 * dt));
-    camera.lookAt(state.focus.x, state.focus.y + 0.6, state.focus.z);
+    dirV.set(Math.sin(state.yaw) * cp, Math.sin(state.pitch), Math.cos(state.yaw) * cp).normalize();
+
+    // 射线缩距：撞到地形/建筑就把相机沿视线拉近，而不是把高度顶起来
+    // （高度硬顶会和"拉回目标位"打架，来回弹 → 就是之前那种抽动）
+    let allowed = state.distance;
+    if (collider) allowed = collider(state.focus, dirV, state.distance);
+    // 收近：立即生效（宁可收得快，也不能让镜头钻进墙里）；
+    // 放远：慢慢来，避免"贴着墙角走"时镜头一抽一抽地伸缩。
+    // 之前那种"先抬高再拉回"的弹跳，是因为硬顶高度，现在已经不存在了。
+    if (allowed < state.currentDist) state.currentDist = allowed;
+    else state.currentDist += (allowed - state.currentDist) * (1 - Math.exp(-3.0 * dt));
+
+    desired.copy(state.focus).addScaledVector(dirV, state.currentDist);
+    // 直接落位：焦点和朝向本来就已经平滑了。
+    // 这里若再做一次插值，转视角时相机会「慢半拍」，短暂钻进墙里。
+    camera.position.copy(desired);
+    // 最后一道保险：如果连最近距离都还在某个物件里，就**水平**推开一点点
+    // （只推水平方向，不动高度 —— 动高度就会和"回到目标位"打架，那才是之前抽动的原因）
+    if (postAdjust) postAdjust(camera.position);
+    camera.lookAt(state.focus.x, state.focus.y + 0.1, state.focus.z);
   }
 
   const fixed = {
@@ -113,6 +139,12 @@ export function createCameraRig(camera, cfg, input) {
     nextMode,
     snapshot,
     modes,
+    setCollider(fn) {
+      collider = fn;
+    },
+    setPostAdjust(fn) {
+      postAdjust = fn;
+    },
     modeName: (m) => modeNames[m] ?? m,
     get mode() { return state.mode; },
     // 相机水平的 前进/右 方向（用于 WASD 移动）

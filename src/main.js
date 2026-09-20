@@ -248,26 +248,53 @@ async function boot() {
 
   const blockers = structures.blockers;
   const focus = new THREE.Vector3();
-  const camAvoid = new THREE.Vector3();
   const galleryLook = gallery.cameraLook.clone();
 
-  // 相机避让：不要穿进房子/灯塔，也不要钻到地面以下
-  function resolveCamera(pos) {
-    const minY = layout.heightAt(pos.x, pos.z) + 1.15;
-    if (pos.y < minY) pos.y = minY;
+  // ---------- 相机避让：沿视线采样，撞到东西就把相机拉近 ----------
+  // 关键：只"缩距"，不"抬高度"。抬高度会和"回到目标位"打架 → 来回弹（抽动）。
+  rig.setCollider((f, dir, maxDist) => {
+    const steps = 16;
+    for (let i = 1; i <= steps; i++) {
+      const t = (i / steps) * maxDist;
+      const px = f.x + dir.x * t;
+      const py = f.y + dir.y * t;
+      const pz = f.z + dir.z * t;
+      let hit = py < layout.heightAt(px, pz) + 0.45;
+      if (!hit) {
+        for (const b of blockers) {
+          if (b.h !== undefined && py > b.h) continue;
+          const dx = px - b.x;
+          const dz = pz - b.z;
+          if (dx * dx + dz * dz < (b.r + 0.45) ** 2) {
+            hit = true;
+            break;
+          }
+        }
+      }
+      if (hit) return Math.max(1.3, t - 0.5);
+    }
+    return maxDist;
+  });
+
+  // 兜底：收最近了还在物件里（比如玩家贴着晒鱼干架站），就水平推开一点
+  rig.setPostAdjust((pos) => {
     for (const b of blockers) {
       if (b.h !== undefined && pos.y > b.h) continue;
       const dx = pos.x - b.x;
       const dz = pos.z - b.z;
       const d = Math.hypot(dx, dz);
-      const need = b.r + 1.0;
+      const need = b.r + 0.4;
       if (d < need) {
-        const k = d < 1e-4 ? 0 : (need - d) / d;
-        pos.x += d < 1e-4 ? need : dx * k;
-        pos.z += d < 1e-4 ? need : dz * k;
+        if (d < 1e-4) {
+          pos.x += need;
+        } else {
+          const k = (need - d) / d;
+          pos.x += dx * k;
+          pos.z += dz * k;
+        }
       }
     }
-  }
+  });
 
   // 夜晚灯光
   const lampFactor = (hour) => {
@@ -307,11 +334,7 @@ async function boot() {
       camera.position.copy(freeCam.pos);
       camera.lookAt(freeCam.look);
     } else if (rig.mode === 'follow') {
-      // 相机避让（建筑/地形）先算到临时位置，再平滑过去 —— 直接硬推会「抽动」
-      camAvoid.copy(camera.position);
-      resolveCamera(camAvoid);
-      camera.position.lerp(camAvoid, 1 - Math.exp(-16 * dt));
-      camera.lookAt(player.position.x, player.position.y + 0.6, player.position.z);
+      // 避让已经在 rig 里用「射线缩距」处理了，这里不再额外动相机
     }
 
     ocean.update(elapsed, hour, sky.fog.color, sky.fog.near, sky.fog.far);
@@ -548,10 +571,14 @@ async function boot() {
     setPitch: (deg) => {
       rig.state.pitch = (deg * Math.PI) / 180;
     },
+    setYaw: (deg) => {
+      rig.state.yaw = (deg * Math.PI) / 180;
+    },
     cameraInfo: () => ({
       pos: camera.position.toArray().map((v) => +v.toFixed(2)),
       pitchDeg: +((rig.state.pitch * 180) / Math.PI).toFixed(1),
       yawDeg: +((rig.state.yaw * 180) / Math.PI).toFixed(1),
+      dist: +camera.position.distanceTo(rig.state.focus).toFixed(2),
       mode: rig.mode
     }),
     pondInfo: () => layout.ponds.map((p) => ({ x: p.x, z: p.z, r: p.r, surfaceY: +p.surfaceY.toFixed(2), floorY: +p.floorY.toFixed(2) })),

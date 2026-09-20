@@ -176,15 +176,15 @@
   },
 
   "camera": {
-    "_说明": "minPitchDeg 用负数就能抬头看天（相机降到玩家下方再往上看）",
-    "fov": 52,
-    "distance": 13.5,
-    "minDistance": 5,
-    "maxDistance": 30,
-    "pitchDeg": 40,
-    "minPitchDeg": -32,
-    "maxPitchDeg": 85,
-    "followLerp": 9.0,
+    "_说明": "距离调近了：镜头离玩家近一点就不容易撞到房子/树，也就不会被推来推去。minPitchDeg 用负数可以抬头看天。",
+    "fov": 54,
+    "distance": 9.5,
+    "minDistance": 3.0,
+    "maxDistance": 18,
+    "pitchDeg": 42,
+    "minPitchDeg": -30,
+    "maxPitchDeg": 80,
+    "followLerp": 10.0,
     "mouseSensitivity": 0.0028
   },
 
