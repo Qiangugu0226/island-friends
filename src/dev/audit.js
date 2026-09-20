@@ -202,6 +202,50 @@ export function createAudit({ structures, layout, cfg }) {
       });
     }
 
+    // 零件是否"悬浮"：多零件的道具里，每个零件都该和至少一个别的零件接触
+    // （比如水井的木桶要有挂绳、顶棚要压在木架上）
+    const TOL = 0.12;
+    for (const item of items) {
+      if (item.kind === 'decor' || item.kind === 'rock') continue;
+      const obj = item.obj;
+      if (!obj.isGroup || obj.children.length < 2) continue;
+      const parts = [];
+      for (const child of obj.children) {
+        if (child.isInstancedMesh) continue;
+        const bb = new THREE.Box3().setFromObject(child);
+        if (bb.isEmpty()) continue;
+        parts.push({ box: bb, name: child.name || child.type });
+      }
+      if (parts.length < 2) continue;
+      const touch = (a, b) =>
+        a.min.x - TOL <= b.max.x &&
+        a.max.x + TOL >= b.min.x &&
+        a.min.y - TOL <= b.max.y &&
+        a.max.y + TOL >= b.min.y &&
+        a.min.z - TOL <= b.max.z &&
+        a.max.z + TOL >= b.min.z;
+      for (let i = 0; i < parts.length; i++) {
+        let connected = false;
+        for (let j = 0; j < parts.length; j++) {
+          if (i === j) continue;
+          if (touch(parts[i].box, parts[j].box)) {
+            connected = true;
+            break;
+          }
+        }
+        if (!connected) {
+          const c = parts[i].box.getCenter(new THREE.Vector3());
+          problems.push({
+            type: '零件悬浮',
+            name: `${item.name} · ${parts[i].name}`,
+            x: +c.x.toFixed(1),
+            z: +c.z.toFixed(1),
+            detail: `没有和任何其他零件接触（y=${c.y.toFixed(2)}）`
+          });
+        }
+      }
+    }
+
     return {
       itemCount: items.length,
       problems,

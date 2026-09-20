@@ -646,33 +646,55 @@ export function createAssets(palette, textures) {
   // ---------- 中式水井 ----------
   function makeWell() {
     const g = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.15, 1.0, 12), mat(palette.stone));
+    // 井圈：开口圆柱（用实心圆柱会把井口封死，看不到水面）
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.18, 1.0, 12, 1, true), mat(palette.stone));
     ring.position.y = 0.5;
     g.add(ring);
-    const ringTop = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.1, 5, 14), mat(palette.stoneDark));
+    const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.94, 0.98, 1.0, 12, 1, true), mat(palette.stoneDark));
+    inner.position.y = 0.5;
+    g.add(inner);
+    // 井沿石圈
+    const ringTop = new THREE.Mesh(new THREE.TorusGeometry(0.98, 0.1, 5, 16), mat(palette.stoneDark));
     ringTop.rotation.x = Math.PI / 2;
     ringTop.position.y = 1.0;
     g.add(ringTop);
-    const water = new THREE.Mesh(new THREE.CircleGeometry(0.9, 12), mat(palette.waterPond));
+    // 井底水面（压低一点，看着有深度）
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.92, 12), mat(palette.waterPond));
     water.rotation.x = -Math.PI / 2;
-    water.position.y = 0.9;
+    water.position.y = 0.34;
     g.add(water);
+
+    // 木架：柱子从井沿（1.0）顶到棚底（2.5）
     for (const s of [-1, 1]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.0, 0.16), mat(palette.timberDark));
-      post.position.set(s * 1.0, 1.4, 0);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.6, 0.16), mat(palette.timberDark));
+      post.position.set(s * 1.02, 1.7, 0); // 0.9 ~ 2.5
       g.add(post);
     }
-    const winch = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.9, 8), mat(palette.timber));
+    // 横梁 + 辘轳（两端插进立柱）
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.13, 0.13), mat(palette.timber));
+    beam.position.set(0, 2.28, 0);
+    g.add(beam);
+    const winch = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 2.0, 8), mat(palette.timber));
     winch.rotation.z = Math.PI / 2;
-    winch.position.y = 2.25;
+    winch.position.y = 2.28;
     g.add(winch);
-    const crank = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.5, 0.09), mat(palette.timberDark));
-    crank.position.set(1.15, 2.0, 0);
-    g.add(crank);
+    // 摇柄（接在辘轳一端）
+    const crankArm = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.42, 0.09), mat(palette.timberDark));
+    crankArm.position.set(1.12, 2.1, 0);
+    g.add(crankArm);
+    const crankGrip = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.24, 0.09), mat(palette.timberDark));
+    crankGrip.position.set(1.12, 1.9, 0.14);
+    g.add(crankGrip);
+    // 吊绳：上接辘轳、下接木桶（不然木桶是"悬浮"的）
+    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.78, 4), mat(palette.trunkDark, { noTex: true }));
+    rope.position.set(0, 1.95, 0); // 1.56 ~ 2.34
+    g.add(rope);
     const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.22, 0.4, 8), mat(palette.timber));
-    bucket.position.set(0, 1.45, 0);
+    bucket.position.set(0, 1.36, 0); // 1.16 ~ 1.56
     g.add(bucket);
-    const roof = new THREE.Mesh(gableRoofGeometry(2.6, 0.7, 1.9, 0.3), mat(palette.roofTile));
+
+    // 顶棚：底面正好压在立柱顶上
+    const roof = new THREE.Mesh(gableRoofGeometry(2.5, 0.66, 1.8, 0.26), mat(palette.roofTile));
     roof.position.y = 2.5;
     g.add(roof);
     return shade(g);
