@@ -3,44 +3,56 @@
     "maxStep": 0,
     "avg": 0,
     "spike": 0,
+    "medSpeed": 0,
+    "maxSpeed": 0,
+    "speedSpike": 0,
     "minClearance": 7.180000000000001,
     "insideSolid": 0,
     "radialReversals": 0
   },
   "walk": {
-    "maxStep": 0.6606814663663569,
-    "avg": 0.16908065990099946,
-    "spike": 0.4916008064653575,
-    "minClearance": 5.7,
+    "maxStep": 0.8521150157109056,
+    "avg": 0.18555882887100839,
+    "spike": 0.6665561868398973,
+    "medSpeed": 2.4705590647010363,
+    "maxSpeed": 9.242028369667704,
+    "speedSpike": 6.771469304966668,
+    "minClearance": 4.890000000000001,
     "insideSolid": 0,
     "radialReversals": 0
   },
   "spin": {
-    "maxStep": 5.9001440660377105,
-    "avg": 0.7348794854591014,
-    "spike": 5.165264580578609,
-    "minClearance": 1.8599999999999994,
+    "maxStep": 5.90572603495963,
+    "avg": 0.7835729476543709,
+    "spike": 5.122153087305259,
+    "medSpeed": 6.770336585209704,
+    "maxSpeed": 62.16553721010137,
+    "speedSpike": 55.395200624891665,
+    "minClearance": 1.87,
     "insideSolid": 0,
     "radialReversals": 2
   },
   "circle": {
-    "maxStep": 5.480310210197958,
-    "avg": 0.4353018456710727,
-    "spike": 5.045008364526885,
+    "maxStep": 5.929249530927162,
+    "avg": 0.5090229596274942,
+    "spike": 5.4202265712996684,
+    "medSpeed": 0.12391573729403609,
+    "maxSpeed": 78.74169364092737,
+    "speedSpike": 78.61777790363332,
     "minClearance": 1.4400000000000004,
     "insideSolid": 0,
-    "radialReversals": 6
+    "radialReversals": 7
   },
   "look": [
     {
       "pitch": 30,
-      "clear": 3.92,
-      "dist": 5.89
+      "clear": 4.04,
+      "dist": 6.11
     },
     {
       "pitch": 12,
-      "clear": 2.23,
-      "dist": 6
+      "clear": 2.11,
+      "dist": 5.44
     },
     {
       "pitch": 0,
@@ -50,12 +62,12 @@
     {
       "pitch": -12,
       "clear": 0.7,
-      "dist": 4.02
+      "dist": 4.25
     },
     {
       "pitch": -22,
-      "clear": 0.71,
-      "dist": 3.84
+      "clear": 0.68,
+      "dist": 3.9
     },
     {
       "pitch": -30,

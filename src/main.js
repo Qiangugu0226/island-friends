@@ -16,6 +16,8 @@ import { createHud } from './ui/hud.js';
 import { createAudit } from './dev/audit.js';
 import { createTextures } from './core/textures.js';
 import { createCollision } from './systems/collision.js';
+import { createContactShadows } from './core/contact-shadows.js';
+import { createGrade } from './core/grade.js';
 import { createBubbles } from './systems/bubbles.js';
 import { createClues } from './systems/clues.js';
 import { createAnimal } from './systems/animal-ai.js';
@@ -67,6 +69,25 @@ async function boot() {
   if (params.has('dist')) rig.state.distance = parseFloat(params.get('dist'));
   const time = createTime(cfg.time);
   if (params.has('hour')) time.setHour(parseFloat(params.get('hour')));
+
+  // ---------- P5-2 色彩分级（后处理）----------
+  // ?grade=0 可关掉做对照；world.json 里 grade 段是全部可调参数
+  const grade = createGrade(renderer, scene, camera, cfg.grade ?? {});
+  if (params.has('samples')) grade.setSamples(parseInt(params.get('samples'), 10));
+  // URL 实时调参：?sat=1.2&contrast=1.1&vignette=0.3&warm=1.2&cool=0.8&exposure=1.05&lift=0.02
+  for (const [key, uni] of [
+    ['exposure', 'uExposure'],
+    ['contrast', 'uContrast'],
+    ['sat', 'uSaturation'],
+    ['warm', 'uWarm'],
+    ['cool', 'uCool'],
+    ['vignette', 'uVignette'],
+    ['lift', 'uLift']
+  ]) {
+    if (params.has(key)) grade.uniforms[uni].value = parseFloat(params.get(key));
+  }
+  grade.setSize(window.innerWidth, window.innerHeight, renderer.getPixelRatio());
+  let gradeOn = (cfg.grade?.enabled ?? true) && params.get('grade') !== '0';
 
   // ---------- 世界 ----------
   hud.setLoading('正在塑造小岛地形…', 0.08);
@@ -169,10 +190,31 @@ async function boot() {
     `[collision] 圆形碰撞 ${collision.circles.length} 个 · 院墙 ${collision.walls.length} 段 · 平台 ${collision.platforms.length} 个`
   );
 
+  // ---------- P5-2 接触阴影：把物件"压"在地上 ----------
+  // 房子用整块矩形暗片（和院子轮廓一致），其余按碰撞半径给一张柔边圆片；
+  // 院墙沿每一段铺一条窄暗带。全部合并进 1 个 InstancedMesh。
+  const shadowBlobs = [];
+  const blobOf = (x, z, sx, sz, rot = 0) => shadowBlobs.push({ x, z, y: layout.heightAt(x, z), sx, sz, rot });
+  for (const b of structures.blockers) {
+    if (b.kind === 'house') continue; // 房子单独用矩形
+    const k = b.kind === 'tower' ? 1.45 : b.kind === 'building' ? 1.35 : b.kind === 'tree' ? 3.1 : b.kind === 'post' ? 2.2 : 2.3;
+    blobOf(b.x, b.z, b.r * k * 2, b.r * k * 2);
+  }
+  for (const pad of layout.pads) blobOf(pad.x, pad.z, pad.w + 1.0, pad.d + 1.0, pad.rot ?? 0);
+  for (const c of scatter.colliders) blobOf(c.x, c.z, c.r * 5.0, c.r * 5.0);
+  for (const w of structures.walls) {
+    const L = Math.hypot(w.bx - w.ax, w.bz - w.az);
+    blobOf((w.ax + w.bx) / 2, (w.az + w.bz) / 2, L + 0.55, (w.thickness ?? 0.42) + 0.8, Math.atan2(-(w.bz - w.az), w.bx - w.ax));
+  }
+  const shadows = createContactShadows(shadowBlobs, cfg.contactShadows ?? {});
+  const shadowsOn = params.get('shadows') !== '0';
+  shadows.group.visible = shadowsOn;
+  scene.add(shadows.group);
+  console.log(`[contact] 接触阴影 ${shadows.count} 片（合并 1 个 draw call）${shadowsOn ? '' : ' · 已关闭'}`);
+
   hud.setLoading('正在放置玩家…', 0.86);
   await nextFrame();
-  const player = createPlayer(assets, palette, cfg.player, layout);
-  if (params.has('x')) player.state.position.x = parseFloat(params.get('x'));
+  const player = createPlayer(assets, palette, cfg.player, layout);  if (params.has('x')) player.state.position.x = parseFloat(params.get('x'));
   if (params.has('z')) player.state.position.z = parseFloat(params.get('z'));
   player.teleport(player.state.position.x, player.state.position.z);
   scene.add(player.root);
@@ -184,6 +226,9 @@ async function boot() {
   spawnMarker.rotation.x = -Math.PI / 2;
   spawnMarker.position.set(cfg.player.spawn.x, layout.heightAt(cfg.player.spawn.x, cfg.player.spawn.z) + 0.06, cfg.player.spawn.z);
   scene.add(spawnMarker);
+
+  // 会动的角色也带一张暗片（每帧跟着走）
+  const playerBlob = shadows.makeBlob(1.5);
 
   hud.setLoading('正在布置资产总览展台…', 0.94);
   await nextFrame();
@@ -203,6 +248,7 @@ async function boot() {
   const dwarf = animalsConfig.animals[0];
   const animal = createAnimal({ scene, assets, palette, layout, cfg: dwarf, audio, bubbleMakers: bubbles });
   animal.reset();
+  const dogBlob = shadows.makeBlob(1.1);
 
   const affection = createAffection({
     scene,
@@ -463,7 +509,16 @@ async function boot() {
       });
     }
 
-    renderer.render(scene, camera);
+    // 会动的角色：暗片跟着走（放在地上一点点）
+    if (shadowsOn) {
+      playerBlob.position.set(player.position.x, layout.heightAt(player.position.x, player.position.z) + 0.03, player.position.z);
+      const dp = animal.state.position;
+      dogBlob.visible = animal.state.mode !== 'hidden';
+      dogBlob.position.set(dp.x, layout.heightAt(dp.x, dp.z) + 0.03, dp.z);
+    }
+
+    if (gradeOn) grade.render();
+    else renderer.render(scene, camera);
 
     hud.update(dt, {
       clock: time.clockText(),
@@ -472,7 +527,7 @@ async function boot() {
       speed: time.speed,
       position: player.position,
       viewName: rig.modeName(rig.mode),
-      objects: `${renderer.info.render.calls} draw / ${(renderer.info.render.triangles / 1000).toFixed(0)}k tri`,
+      objects: `${(gradeOn ? grade.stats.calls : renderer.info.render.calls)} draw / ${((gradeOn ? grade.stats.triangles : renderer.info.render.triangles) / 1000).toFixed(0)}k tri`,
       hour
     });
 
@@ -484,6 +539,7 @@ async function boot() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    grade.setSize(window.innerWidth, window.innerHeight, renderer.getPixelRatio());
   });
 
   // 自动化冒烟测试：?walk=1 会模拟按住 W 走 3 秒，并把位移打到控制台
@@ -515,6 +571,18 @@ async function boot() {
       return { forward: b.forward.toArray(), right: b.right.toArray() };
     },
     info: () => renderer.info,
+    // 分级开着时 renderer.info 会被最后那个全屏 pass 重置，所以另给一个"当前这一帧"的统计
+    renderStats: () => ({
+      calls: gradeOn ? grade.stats.calls : renderer.info.render.calls,
+      triangles: gradeOn ? grade.stats.triangles : renderer.info.render.triangles,
+      grade: gradeOn,
+      shadows: shadowsOn ? shadows.count : 0
+    }),
+    setGrade: (on) => {
+      gradeOn = !!on;
+      return gradeOn;
+    },
+    gradeInfo: () => ({ enabled: gradeOn, ...Object.fromEntries(Object.entries(grade.uniforms).map(([k, v]) => [k, v.value])) }),
     THREE,
     scene,
     audit: () => createAudit({ structures, layout, cfg })(),

@@ -48,9 +48,14 @@ for (const [name, x, z, yaw, pitch] of views) {
           if (n < 70) requestAnimationFrame(tick);
           else {
             const s = t.slice(10).sort((a, b) => a - b);
+            const stats = window.__island.renderStats
+              ? window.__island.renderStats()
+              : { calls: window.__island.info().render.calls, triangles: window.__island.info().render.triangles };
             res({
-              calls: window.__island.info().render.calls,
-              tris: Math.round(window.__island.info().render.triangles / 1000),
+              calls: stats.calls,
+              tris: Math.round(stats.triangles / 1000),
+              grade: !!stats.grade,
+              shadows: stats.shadows ?? 0,
               med: +s[Math.floor(s.length / 2)].toFixed(1),
               p95: +s[Math.floor(s.length * 0.95)].toFixed(1)
             });
@@ -59,6 +64,8 @@ for (const [name, x, z, yaw, pitch] of views) {
         requestAnimationFrame(tick);
       })
   );
-  console.log(`${name.padEnd(6, '　')} draw ${String(st.calls).padStart(4)} · ${String(st.tris).padStart(4)}k 三角面 · 帧时间中位 ${st.med}ms / p95 ${st.p95}ms`);
+  console.log(
+    `${name.padEnd(6, '　')} draw ${String(st.calls).padStart(4)} · ${String(st.tris).padStart(4)}k 三角面 · 帧时间中位 ${st.med}ms / p95 ${st.p95}ms · 分级${st.grade ? '开' : '关'} · 暗片${st.shadows}`
+  );
 }
 await browser.close();

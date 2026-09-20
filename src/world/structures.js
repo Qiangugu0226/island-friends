@@ -109,7 +109,8 @@ export function buildStructures(scene, layout, assets, palette) {
       x: pad.x,
       z: pad.z,
       r: Math.max(pad.w, pad.d) * 0.62,
-      h: pad.y + pad.wallH + pad.roofH + 0.8
+      h: pad.y + pad.wallH + pad.roofH + 0.8,
+      kind: 'house'
     });
     stats.houses++;
 
@@ -177,7 +178,7 @@ export function buildStructures(scene, layout, assets, palette) {
     tower.group.rotation.y = bt.rot ?? 0;
     group.add(tower.group);
     nightLights.push(tower.light);
-    blockers.push({ x: bt.x, z: bt.z, r: 3.4, h: y + (bt.height ?? 14) + 2 });
+    blockers.push({ x: bt.x, z: bt.z, r: 3.4, h: y + (bt.height ?? 14) + 2, kind: 'tower' });
 
     // 塔院矮墙：同样用不规则曲线（朝路的 +z 侧留口）
     const railGate = { x: bt.x, z: bt.z + 7.6, r: 2.4 };
@@ -208,7 +209,7 @@ export function buildStructures(scene, layout, assets, palette) {
     shrine.group.rotation.y = sh.rot ?? 0;
     group.add(shrine.group);
     nightLights.push(shrine.light);
-    blockers.push({ x: sh.x, z: sh.z, r: 2.2, h: y + 3.2 });
+    blockers.push({ x: sh.x, z: sh.z, r: 2.2, h: y + 3.2, kind: 'building' });
 
     for (const [dx, dz] of [[-4.6, 3.2], [4.2, 4.0]]) {
       const bx = sh.x + dx;
@@ -219,7 +220,7 @@ export function buildStructures(scene, layout, assets, palette) {
       banyan.userData.audit = { kind: 'tree' };
       banyan.position.set(bx, by, bz);
       group.add(banyan);
-      blockers.push({ x: bx, z: bz, r: 1.1, h: by + 2.2 });
+      blockers.push({ x: bx, z: bz, r: 1.1, h: by + 2.2, kind: 'tree' });
     }
   }
 
@@ -377,7 +378,7 @@ export function buildStructures(scene, layout, assets, palette) {
         group.add(obj);
       }
       occupied.push({ x, z, r: myR, name: opts.name });
-      if (opts.blockerRadius) blockers.push({ x, z, r: opts.blockerRadius, h: y + (opts.blockerHeight ?? 2.2) });
+      if (opts.blockerRadius) blockers.push({ x, z, r: opts.blockerRadius, h: y + (opts.blockerHeight ?? 2.2), kind: 'prop' });
       // 立柱类道具（晾衣绳的两根杆子）单独加碰撞
       for (const [lx, lz] of opts.posts ?? []) {
         const c = Math.cos(item.rot ?? 0);
@@ -386,7 +387,8 @@ export function buildStructures(scene, layout, assets, palette) {
           x: x + lx * c + lz * sn,
           z: z - lx * sn + lz * c,
           r: opts.postRadius ?? 0.25,
-          h: y + (opts.blockerHeight ?? 2.4)
+          h: y + (opts.blockerHeight ?? 2.4),
+          kind: 'post'
         });
       }
       stats.props++;

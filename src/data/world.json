@@ -198,6 +198,27 @@
     "pondDepthLimit": 0.8
   },
 
+  "grade": {
+    "_说明": "P5-2 色彩分级（后处理调色）。exposure 曝光 / contrast 对比 / saturation 饱和 / warmHighlights 暖高光 / coolShadows 冷阴影 / vignette 暗角 / liftShadows 暗部提亮。enabled=false 或 URL 加 ?grade=0 可关掉做对照。",
+    "enabled": true,
+    "exposure": 1.0,
+    "contrast": 1.07,
+    "saturation": 1.16,
+    "warmHighlights": 1.1,
+    "coolShadows": 1.0,
+    "vignette": 0.26,
+    "liftShadows": 0.018,
+    "fxaa": true,
+    "samples": 0
+  },
+
+  "contactShadows": {
+    "_说明": "P5-2 接触阴影：物件底部铺的柔边暗片。opacity 深浅 / color 颜色 / lift 离地高度。URL 加 ?shadows=0 可关掉。",
+    "opacity": 0.3,
+    "color": "#2A2118",
+    "lift": 0.03
+  },
+
   "gallery": {
     "_说明": "资产总览展台（按 V 切到「资产总览」视角）。放在地图外，不影响主场景。",
     "x": 0,

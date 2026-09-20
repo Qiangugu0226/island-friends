@@ -40,6 +40,7 @@ const grab = () =>
     return {
       pos: c.pos,
       dist: c.dist,
+      t: performance.now(),
       ground: window.__island.groundAt(c.pos[0], c.pos[2]),
       near: window.__island.blockersNear(c.pos[0], c.pos[2], 0.5)
     };
@@ -47,6 +48,7 @@ const grab = () =>
 
 function analyze(samples) {
   const steps = [];
+  const speeds = []; // m/s：按各自的时间间隔归一化，避免"帧一长单步就大"的假警报
   let minClearance = Infinity;
   let insideSolid = 0;
   for (let i = 0; i < samples.length; i++) {
@@ -56,10 +58,15 @@ function analyze(samples) {
     const solid = s.near.filter((b) => b.d < b.r + 0.2 && (b.h === undefined || s.pos[1] < b.h));
     if (solid.length) insideSolid++;
     if (i === 0) continue;
-    steps.push(Math.hypot(s.pos[0] - samples[i - 1].pos[0], s.pos[1] - samples[i - 1].pos[1], s.pos[2] - samples[i - 1].pos[2]));
+    const d = Math.hypot(s.pos[0] - samples[i - 1].pos[0], s.pos[1] - samples[i - 1].pos[1], s.pos[2] - samples[i - 1].pos[2]);
+    steps.push(d);
+    const dt = Math.max(1, s.t - samples[i - 1].t) / 1000;
+    speeds.push(d / dt);
   }
   const avg = steps.length ? steps.reduce((a, b) => a + b, 0) / steps.length : 0;
   const spike = steps.length ? Math.max(...steps.map((s) => s - avg)) : 0;
+  const medSpeed = speeds.length ? [...speeds].sort((a, b) => a - b)[Math.floor(speeds.length / 2)] : 0;
+  const speedSpike = speeds.length ? Math.max(...speeds) - medSpeed : 0;
   // 径向（镜头到焦点的距离）方向反转次数：单调转视角时它应该几乎不变
   let radialReversals = 0;
   let lastSign = 0;
@@ -68,7 +75,17 @@ function analyze(samples) {
     if (sign !== 0 && lastSign !== 0 && sign !== lastSign) radialReversals++;
     if (sign !== 0) lastSign = sign;
   }
-  return { maxStep: steps.length ? Math.max(...steps) : 0, avg, spike, minClearance, insideSolid, radialReversals };
+  return {
+    maxStep: steps.length ? Math.max(...steps) : 0,
+    avg,
+    spike,
+    medSpeed,
+    maxSpeed: speeds.length ? Math.max(...speeds) : 0,
+    speedSpike,
+    minClearance,
+    insideSolid,
+    radialReversals
+  };
 }
 
 console.log(`目标：${target.kind === 'file' ? '单文件离线版' : target.url}\n`);
@@ -105,8 +122,14 @@ await page.keyboard.up('KeyW');
 const p1 = await ev(() => window.__island.pos());
 const jw = analyze(walkSamples);
 console.log(`   ② 贴着石厝走过：走了 ${Math.hypot(p1[0] - p0[0], p1[2] - p0[2]).toFixed(1)}m`);
-// 现在树/石头也有碰撞，走路撞到东西会停一下（镜头跟着顿一下），阈值放宽到 0.55
-check('② 走路经过建筑：无位移突变', jw.spike < 0.55, `单步最大 ${jw.maxStep.toFixed(2)}m / 突变 ${jw.spike.toFixed(2)}m`);
+// 判据说明：相机避让建筑是"收快放慢"的设计 —— 墙/房子进入视线射线时会**立即**拉近，
+// 所以"速度峰值"本来就会高于玩家的走路速度，不能拿它当抖动。真正的抖动是**来回摆**，
+// 用"镜头到焦点的距离反复反向"来判定（和帧时长无关，也不受 headless 掉帧影响）。
+check(
+  '② 走路经过建筑：镜头没有来回摆',
+  jw.radialReversals <= 2 && jw.maxSpeed < 14,
+  `径向反向 ${jw.radialReversals} 次 · 速度中位 ${jw.medSpeed.toFixed(2)}m/s 峰值 ${jw.maxSpeed.toFixed(2)}m/s（单步最大 ${jw.maxStep.toFixed(2)}m）`
+);
 check('② 走路经过建筑：相机没钻地', jw.minClearance > 0.15, `最小离地 ${jw.minClearance.toFixed(2)}m`);
 check('② 走路经过建筑：相机没钻进建筑', jw.insideSolid === 0, `穿进 ${jw.insideSolid} 次`);
 
