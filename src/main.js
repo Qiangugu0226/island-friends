@@ -510,6 +510,8 @@ async function boot() {
       return { forward: b.forward.toArray(), right: b.right.toArray() };
     },
     info: () => renderer.info,
+    THREE,
+    scene,
     audit: () => createAudit({ structures, layout, cfg })(),
     // P2：给自动化测试用的钩子
     dog: () => ({

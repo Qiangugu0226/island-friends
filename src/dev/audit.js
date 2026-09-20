@@ -246,6 +246,80 @@ export function createAudit({ structures, layout, cfg }) {
       }
     }
 
+    // 墙体是否贴地：院墙/围栏的每一段都要贴着地形（之前是"整个环一个高度"，地形一起伏就悬空）
+    for (const item of items) {
+      if (item.kind !== 'decor') continue;
+      let bad = 0;
+      let worst = 0;
+      let worstAt = null;
+      for (const child of item.obj.children) {
+        const bb = new THREE.Box3().setFromObject(child);
+        if (bb.isEmpty()) continue;
+        // 压在别的零件上的（比如墙顶的压顶石）不算悬空
+        const supported = item.obj.children.some((other) => {
+          if (other === child) return false;
+          const ob = new THREE.Box3().setFromObject(other);
+          if (ob.isEmpty()) return false;
+          const overlapXZ =
+            ob.min.x - 0.06 <= bb.max.x &&
+            ob.max.x + 0.06 >= bb.min.x &&
+            ob.min.z - 0.06 <= bb.max.z &&
+            ob.max.z + 0.06 >= bb.min.z;
+          return overlapXZ && Math.abs(ob.max.y - bb.min.y) < 0.25;
+        });
+        if (supported) continue;
+        const cx = (bb.min.x + bb.max.x) / 2;
+        const cz = (bb.min.z + bb.max.z) / 2;
+        const gap = bb.min.y - layout.heightAt(cx, cz); // >0 悬空 / <0 埋进地面
+        if (gap > 0.12 || gap < -0.5) {
+          bad++;
+          if (!worstAt || Math.abs(gap) > Math.abs(worst)) {
+            worst = gap;
+            worstAt = [cx, cz];
+          }
+        }
+      }
+      if (bad) {
+        problems.push({
+          type: '墙体悬空',
+          name: item.name,
+          x: +worstAt[0].toFixed(1),
+          z: +worstAt[1].toFixed(1),
+          detail: `${bad} 段没贴地（最大偏差 ${worst.toFixed(2)}m）`
+        });
+      }
+    }
+
+    // 道具是否插进院墙（摆位没把墙算进禁区时会出现）
+    const wallList = structures.walls ?? [];
+    for (const it of items) {
+      if (it.kind !== 'prop') continue;
+      for (const wl of wallList) {
+        const c = Math.cos(wl.rot ?? 0);
+        const s = Math.sin(wl.rot ?? 0);
+        const dx = it.cx - wl.x;
+        const dz = it.cz - wl.z;
+        const lx = dx * c - dz * s;
+        const lz = dx * s + dz * c;
+        const ax = Math.abs(lx);
+        const az = Math.abs(lz);
+        const band = (wl.thickness ?? 0.42) / 2 + it.r * 0.6;
+        const onX = Math.abs(ax - wl.halfW) <= band && az <= wl.halfD + band;
+        const onZ = Math.abs(az - wl.halfD) <= band && ax <= wl.halfW + band;
+        if (!onX && !onZ) continue;
+        const inGap = (wl.gaps ?? []).some((gp) => (lx - gp.x) ** 2 + (lz - gp.z) ** 2 < (gp.r ?? 2.4) ** 2);
+        if (inGap) continue;
+        problems.push({
+          type: '道具插进院墙',
+          name: it.name,
+          x: +it.cx.toFixed(1),
+          z: +it.cz.toFixed(1),
+          detail: `与院墙（${wl.x.toFixed(0)},${wl.z.toFixed(0)}）相交`
+        });
+        break;
+      }
+    }
+
     return {
       itemCount: items.length,
       problems,

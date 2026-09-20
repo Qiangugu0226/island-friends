@@ -77,7 +77,8 @@ console.log(`目标：${target.kind === 'file' ? '单文件离线版' : target.u
 await ev(() => window.__island.teleport(-6, -14));
 await delay(800);
 await ev(() => window.__island.setPitch(40));
-await delay(800);
+// 镜头从"被挡住"恢复到正常距离是慢速的（3/s），要等它稳定再采样，否则测到的是"还在恢复"而不是抖动
+await delay(2600);
 const idle = [];
 for (let i = 0; i < 24; i++) {
   await delay(80);

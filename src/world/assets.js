@@ -243,12 +243,29 @@ export function createAssets(palette, textures) {
   }
 
   // ---------- 石砌矮院墙（留门洞）----------
+  // 关键：每一段各自贴合地形（不能用"院子中心一个高度"的刚性环，否则地形一有起伏整段就悬空）
   function makeStoneWallYard(w, d, opts = {}) {
     const g = new THREE.Group();
     const h = opts.height ?? 0.95;
     const t = 0.42;
     const gaps = opts.gaps ?? [];
     const inGap = (x, z) => gaps.some((gp) => Math.hypot(x - gp.x, z - gp.z) < (gp.r ?? 2.2));
+
+    // 墙体所在的世界变换（调用方只设 position/rotation.y，y 由每段自己贴地）
+    const originX = opts.originX ?? 0;
+    const originZ = opts.originZ ?? 0;
+    const rot = opts.rot ?? 0;
+    const cosR = Math.cos(rot);
+    const sinR = Math.sin(rot);
+    const groundAt = opts.groundAt ?? null;
+    const baseY = opts.baseY ?? 0;
+    const SINK = 0.14; // 往下埋一点，起伏处也不会露缝
+    const groundY = (lx, lz) => {
+      if (!groundAt) return baseY;
+      const wx = originX + lx * cosR + lz * sinR;
+      const wz = originZ - lx * sinR + lz * cosR;
+      return groundAt(wx, wz);
+    };
 
     const segGeoX = new THREE.BoxGeometry(1, h, t);
     const segGeoZ = new THREE.BoxGeometry(t, h, 1);
@@ -259,25 +276,28 @@ export function createAssets(palette, textures) {
 
     const build = (x, z, segLen, alongX) => {
       if (segLen <= 0.05) return;
+      const gy = groundY(x, z) - SINK;
       const seg = new THREE.Mesh(alongX ? segGeoX : segGeoZ, wallMat);
       seg.scale.set(alongX ? segLen : 1, 1, alongX ? 1 : segLen);
-      seg.position.set(x, h / 2, z);
+      seg.position.set(x, gy + h / 2, z);
       g.add(seg);
       const cap = new THREE.Mesh(alongX ? capGeoX : capGeoZ, capMat);
       cap.scale.set(alongX ? segLen : 1, 1, alongX ? 1 : segLen);
-      cap.position.set(x, h + 0.06, z);
+      cap.position.set(x, gy + h + 0.06, z);
       g.add(cap);
     };
 
     const step = 1.4;
-    const nx = Math.max(2, Math.round(w / step));
+    // 横向那两条边要"缩进一个墙厚"，否则四个角上两条边会互相插进去（穿模）
+    const innerW = Math.max(0.5, w - t);
+    const nx = Math.max(2, Math.round(innerW / step));
     const nz = Math.max(2, Math.round(d / step));
     for (const z of [-d / 2, d / 2]) {
-      const seg = w / nx;
+      const seg = innerW / nx;
       for (let i = 0; i < nx; i++) {
-        const cx = -w / 2 + seg * (i + 0.5);
+        const cx = -innerW / 2 + seg * (i + 0.5);
         if (inGap(cx, z)) continue;
-        build(cx, z, seg * 0.98, true);
+        build(cx, z, seg * 0.99, true);
       }
     }
     for (const x of [-w / 2, w / 2]) {
@@ -285,7 +305,7 @@ export function createAssets(palette, textures) {
       for (let j = 0; j < nz; j++) {
         const cz = -d / 2 + seg * (j + 0.5);
         if (inGap(x, cz)) continue;
-        build(x, cz, seg * 0.98, false);
+        build(x, cz, seg * 0.99, false);
       }
     }
     return shade(g);

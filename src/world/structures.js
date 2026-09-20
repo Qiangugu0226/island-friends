@@ -29,7 +29,7 @@ export function buildStructures(scene, layout, assets, palette) {
         const y = layout.heightAt(x, z) + 0.05;
         if (y < -0.2) continue;
         // 石板不许铺进房子/院子里（道路若靠得太近，这里会把石板掐掉，避免插进院墙）
-        if (layout.insideCompound(x, z, 0.15)) continue;
+        if (layout.insideCompound(x, z, 0.55)) continue;
         slabPositions.push({
           x,
           y,
@@ -102,10 +102,16 @@ export function buildStructures(scene, layout, assets, palette) {
         best = s;
       }
     }
-    const yard = assets.makeStoneWallYard(fw, fd, { gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }] });
+    const yard = assets.makeStoneWallYard(fw, fd, {
+      gaps: [{ x: best.gap.x, z: best.gap.z, r: 2.6 }],
+      originX: pad.x,
+      originZ: pad.z,
+      rot: pad.rot ?? 0,
+      groundAt: layout.heightAt
+    });
     yard.name = `院墙:${pad.id}`;
     yard.userData.audit = { kind: 'decor' };
-    yard.position.set(pad.x, layout.heightAt(pad.x, pad.z), pad.z);
+    yard.position.set(pad.x, 0, pad.z);
     yard.rotation.y = pad.rot ?? 0;
     group.add(yard);
     // 院墙的碰撞：矩形环 + 门洞（人能进院子，但穿不过墙）
@@ -135,10 +141,17 @@ export function buildStructures(scene, layout, assets, palette) {
     nightLights.push(tower.light);
     blockers.push({ x: bt.x, z: bt.z, r: 3.4, h: y + (bt.height ?? 14) + 2 });
 
-    const rail = assets.makeStoneWallYard(15, 15, { height: 0.8, gaps: [{ x: 0, z: 7.5, r: 2.4 }] });
+    const rail = assets.makeStoneWallYard(15, 15, {
+      height: 0.8,
+      gaps: [{ x: 0, z: 7.5, r: 2.4 }],
+      originX: bt.x,
+      originZ: bt.z,
+      rot: 0,
+      groundAt: layout.heightAt
+    });
     rail.name = '塔院围墙';
     rail.userData.audit = { kind: 'decor' };
-    rail.position.set(bt.x, y, bt.z);
+    rail.position.set(bt.x, 0, bt.z);
     group.add(rail);
     walls.push({ x: bt.x, z: bt.z, rot: 0, halfW: 7.5, halfD: 7.5, thickness: 0.42, gaps: [{ x: 0, z: 7.5, r: 2.4 }] });
   }
@@ -263,7 +276,26 @@ export function buildStructures(scene, layout, assets, palette) {
   const onLandmark = (x, z, margin) =>
     layout.landmarkPads.some((p) => (x - p.x) ** 2 + (z - p.z) ** 2 < (p.padR * 0.5 + margin) ** 2);
 
+  const onWall = (x, z, margin) =>
+    walls.some((wl) => {
+      const c = Math.cos(wl.rot ?? 0);
+      const s = Math.sin(wl.rot ?? 0);
+      const dx = x - wl.x;
+      const dz = z - wl.z;
+      const lx = dx * c - dz * s;
+      const lz = dx * s + dz * c;
+      const ax = Math.abs(lx);
+      const az = Math.abs(lz);
+      const tt = (wl.thickness ?? 0.42) / 2 + margin;
+      const onX = Math.abs(ax - wl.halfW) <= tt && az <= wl.halfD + tt;
+      const onZ = Math.abs(az - wl.halfD) <= tt && ax <= wl.halfW + tt;
+      if (!onX && !onZ) return false;
+      const inGap = (wl.gaps ?? []).some((gp) => (lx - gp.x) ** 2 + (lz - gp.z) ** 2 < (gp.r ?? 2.4) ** 2);
+      return !inGap;
+    });
+
   function busy(px, pz, myR) {
+    if (onWall(px, pz, myR + 0.25)) return true;
     if (inRoad(px, pz, Math.max(0.9, myR * 0.6))) return true;
     if (inPond(px, pz, myR * 0.5 + 0.5)) return true;
     if (onLandmark(px, pz, myR)) return true;
