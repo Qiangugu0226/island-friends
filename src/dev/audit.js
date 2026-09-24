@@ -133,6 +133,25 @@ export function createAudit({ structures, layout, cfg }) {
       }
     }
 
+    // 房子是**旋转矩形**：用外接圆去近似，转到 45° 时圆会包到墙角外面去，
+    // 摆在墙角外的木桶就会被误报成"压房子"。所以涉及石厝的配对改用旋转矩形判定。
+    const padOf = (item) => {
+      if (item.kind !== 'compound') return null;
+      const id = String(item.name).split(':')[1]?.trim();
+      return layout.pads.find((p) => p.id === id) ?? null;
+    };
+    const rectPenetration = (pad, item) => {
+      const c = Math.cos(pad.rot ?? 0);
+      const s = Math.sin(pad.rot ?? 0);
+      const dx = item.cx - pad.x;
+      const dz = item.cz - pad.z;
+      const lx = dx * c - dz * s;
+      const lz = dx * s + dz * c;
+      const ox = pad.w / 2 + item.r - Math.abs(lx);
+      const oz = pad.d / 2 + item.r - Math.abs(lz);
+      return ox > 0 && oz > 0 ? Math.min(ox, oz) : 0;
+    };
+
     // 物件互相重叠（跳过同一组的东西、跳过院墙与石厝这类"套着"的结构、跳过石头对石头）
     for (let i = 0; i < items.length; i++) {
       for (let j = i + 1; j < items.length; j++) {
@@ -143,7 +162,12 @@ export function createAudit({ structures, layout, cfg }) {
         if (a.tag && a.tag === b.tag) continue;
         if (a.kind === 'rock' && b.kind === 'rock') continue;
         const d = Math.hypot(a.cx - b.cx, a.cz - b.cz);
-        const overlap = a.r + b.r - d;
+        const padA = padOf(a);
+        const padB = padOf(b);
+        let overlap;
+        if (padA) overlap = rectPenetration(padA, b);
+        else if (padB) overlap = rectPenetration(padB, a);
+        else overlap = a.r + b.r - d;
         if (overlap <= 0.15) continue;
         const yOverlap = Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY);
         if (yOverlap <= 0.2) continue;
@@ -367,6 +391,52 @@ export function createAudit({ structures, layout, cfg }) {
           detail: `距墙 ${d.toFixed(2)}m`
         });
         break;
+      }
+    }
+
+    // ---------- 房门 / 院门 / 信箱：门口这一套的合理性 ----------
+    // 1) 房门（屋子本地 +Z）必须正对院墙缺口：村道 → 院门 → 房门 应该是一条直线
+    // 2) 信箱必须立在院门旁边（不会顶在门当中，也不会跑到院子另一头）
+    const gates = structures.gates ?? [];
+    for (const g of gates) {
+      if (!g.owner || g.owner === 'beacon') continue; // 航标塔那圈围栏没有"房门"要对
+      let pad = null;
+      let bd = Infinity;
+      for (const pd of layout.pads) {
+        const d = Math.hypot(g.x - pd.x, g.z - pd.z);
+        if (d < bd) {
+          bd = d;
+          pad = pd;
+        }
+      }
+      if (!pad) continue;
+      const doorX = Math.sin(pad.rot ?? 0);
+      const doorZ = Math.cos(pad.rot ?? 0);
+      const dirX = (g.x - pad.x) / Math.max(1e-6, bd);
+      const dirZ = (g.z - pad.z) / Math.max(1e-6, bd);
+      const dot = doorX * dirX + doorZ * dirZ;
+      if (dot < 0.9) {
+        problems.push({
+          type: '房门没对着院门',
+          name: `石厝:${pad.id}`,
+          x: +g.x.toFixed(1),
+          z: +g.z.toFixed(1),
+          detail: `门与院门夹角 ${((Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI).toFixed(0)}°（应 <26°）`
+        });
+      }
+    }
+    for (const it of items) {
+      if (it.kind !== 'prop' || it.name !== '信箱') continue;
+      let best = Infinity;
+      for (const g of gates) best = Math.min(best, Math.hypot(it.cx - g.x, it.cz - g.z));
+      if (!(best > 1.2 && best < 5.0)) {
+        problems.push({
+          type: '信箱位置不合理',
+          name: it.name,
+          x: +it.cx.toFixed(1),
+          z: +it.cz.toFixed(1),
+          detail: best === Infinity ? '附近没有院门' : `离最近院门 ${best.toFixed(1)}m（应在 1.2~5m）`
+        });
       }
     }
 

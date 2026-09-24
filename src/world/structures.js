@@ -10,6 +10,8 @@ export function buildStructures(scene, layout, assets, palette) {
   const blockers = [];
   const walls = [];      // 院墙碰撞：每段一条线段 {ax,az,bx,bz,thickness}
   const gates = [];      // 院墙/围栏上的缺口（门洞），供调试与自动测试判断"哪里本来就该能过"
+  // 道具占位表（避免互相重叠）。放在最前面：石厝小院那边给信箱占位时就要用
+  const occupied = [];
   const platforms = [];  // 能走上去的面（码头栈台）
   const nightLights = [];
   const stats = { houses: 0, yards: 0, props: 0, slabs: 0 };
@@ -99,7 +101,35 @@ export function buildStructures(scene, layout, assets, palette) {
   }
 
   // ---------- 石厝小院 ----------
-  layout.pads.forEach((pad) => {
+  // 信箱不按 world.json 的坐标直接摆：它要"挂在院门旁边"。先把信箱按最近的院子分配掉，
+  // 后面通用 prop 摆放就跳过它们（否则会被 findPlacement 挪到别处、还可能顶在门当中）。
+  const P = cfg.props ?? {};
+  const mailboxOf = new Map(); // padIndex → 配置项
+  const mailboxFree = [];
+  (P.mailboxes ?? []).forEach((item) => {
+    let bi = -1;
+    let bd = Infinity;
+    layout.pads.forEach((pad, i) => {
+      const d = Math.hypot(item.x - pad.x, item.z - pad.z);
+      if (d < bd) {
+        bd = d;
+        bi = i;
+      }
+    });
+    if (bi >= 0 && !mailboxOf.has(bi)) mailboxOf.set(bi, item);
+    else mailboxFree.push(item);
+  });
+
+  layout.pads.forEach((pad, padIndex) => {
+    // 门在屋子本地 +Z 面。让门**正对村子中心** —— 村道从村中心方向来，院门也开在这一侧，
+    // 于是"村道 → 院门 → 房门"连成一条直线（以前房子的朝向是随便转的，三栋的门都背对院门）。
+    const toCenter = new THREE.Vector2(-pad.x, -pad.z).normalize();
+    pad.rot = Math.atan2(toCenter.x, toCenter.y);
+    const doorDirX = Math.sin(pad.rot);
+    const doorDirZ = Math.cos(pad.rot);
+    const alongX = Math.cos(pad.rot); // 沿院墙方向（门的右手边）
+    const alongZ = -Math.sin(pad.rot);
+
     const house = assets.makeStoneHouse(rand, pad);
     house.name = `石厝:${pad.id}`;
     house.userData.audit = { kind: 'compound', tag: pad.id };
@@ -118,8 +148,8 @@ export function buildStructures(scene, layout, assets, palette) {
     // 注意角落用的是"同一个点"，所以不会像最早那样两条边各自铺满、在角上交叉穿模。
     const fw = pad.w + 5.4;
     const fd = pad.d + 5.4;
-    const cosP = Math.cos(pad.rot ?? 0);
-    const sinP = Math.sin(pad.rot ?? 0);
+    const cosP = Math.cos(pad.rot);
+    const sinP = Math.sin(pad.rot);
     const corner = [
       [-fw / 2, -fd / 2],
       [fw / 2, -fd / 2],
@@ -135,18 +165,19 @@ export function buildStructures(scene, layout, assets, palette) {
       outline.push([pad.x + mid[0] * cosP + mid[1] * sinP, pad.z - mid[0] * sinP + mid[1] * cosP]);
       outline.push([pad.x + b[0] * cosP + b[1] * sinP, pad.z - b[0] * sinP + b[1] * cosP]);
     }
-    const toCenter = new THREE.Vector2(-pad.x, -pad.z).normalize();
+    // 缺口开在"房门正对的那条边"的中点上
     let gateIndex = 0;
     let bestDot = -Infinity;
     outline.forEach(([px, pz], i) => {
       if (i % 2 !== 0) return;
-      const d = new THREE.Vector2(px - pad.x, pz - pad.z).normalize().dot(toCenter);
-      if (d > bestDot) {
-        bestDot = d;
+      const d = new THREE.Vector2(px - pad.x, pz - pad.z).normalize();
+      const dot = d.x * doorDirX + d.y * doorDirZ;
+      if (dot > bestDot) {
+        bestDot = dot;
         gateIndex = i;
       }
     });
-    const gate = { x: outline[gateIndex][0], z: outline[gateIndex][1], r: 2.6 };
+    const gate = { x: outline[gateIndex][0], z: outline[gateIndex][1], r: 2.6, owner: pad.id };
     gates.push(gate);
     // 暖色夯土墙 + 稻草压顶（温馨路线；石砌留给航标塔那圈围栏）
     const yard = assets.makeStoneWallPath(outline, {
@@ -164,6 +195,22 @@ export function buildStructures(scene, layout, assets, palette) {
     // 碰撞：逐段墙（每段一条线段），人能进院子但穿不过墙
     for (const seg of yard.userData.wallSegs ?? []) walls.push(seg);
     stats.yards++;
+
+    // 信箱：立在院门旁边（沿墙让开门洞 → 不会顶在门当中；再往外挪一点 → 在墙外侧）
+    const mailboxCfg = mailboxOf.get(padIndex);
+    if (mailboxCfg) {
+      const off = gate.r + 0.5;
+      const mx = gate.x + alongX * off + doorDirX * 0.55;
+      const mz = gate.z + alongZ * off + doorDirZ * 0.55;
+      const box = assets.makeMailbox();
+      box.name = '信箱';
+      box.userData.audit = { kind: 'prop' };
+      box.position.set(mx, layout.heightAt(mx, mz) - 0.06, mz);
+      box.rotation.y = pad.rot; // 投信口朝着村道
+      group.add(box);
+      occupied.push({ x: mx, z: mz, r: 0.55, name: '信箱' });
+      stats.props++;
+    }
   });
 
   // ---------- 航标塔（地标）----------
@@ -181,7 +228,7 @@ export function buildStructures(scene, layout, assets, palette) {
     blockers.push({ x: bt.x, z: bt.z, r: 3.4, h: y + (bt.height ?? 14) + 2, kind: 'tower' });
 
     // 塔院矮墙：同样用不规则曲线（朝路的 +z 侧留口）
-    const railGate = { x: bt.x, z: bt.z + 7.6, r: 2.4 };
+    const railGate = { x: bt.x, z: bt.z + 7.6, r: 2.4, owner: 'beacon' };
     const railPts = organicRing(bt.x, bt.z, 7.5, 7.5, 0, 24, { amp: [0.08, 0.05, 0.03], slopeLimit: 0.5 });
     const rail = assets.makeStoneWallPath(railPts, {
       height: 0.8,
@@ -297,7 +344,8 @@ export function buildStructures(scene, layout, assets, palette) {
   //   1) 不压石板路  2) 不压池塘  3) 不压地标（航标塔/土地庙/梯田）
   //   4) 不与任何已有物件重叠（房子、地标、先前摆下的道具都会被"占位"）
   // 落在禁区里就自动往旁边找一块空地。
-  const occupied = blockers.map((b) => ({ x: b.x, z: b.z, r: b.r, name: b.name }));
+  // 房子/地标也是占位（这时候它们已经全部建好了）
+  for (const b of blockers) occupied.push({ x: b.x, z: b.z, r: b.r, name: b.name });
 
   const inRoad = (x, z, margin) => {
     for (const path of layout.paths) {
@@ -335,6 +383,16 @@ export function buildStructures(scene, layout, assets, palette) {
     if (inRoad(px, pz, Math.max(0.9, myR * 0.6))) return true;
     if (inPond(px, pz, myR * 0.5 + 0.5)) return true;
     if (onLandmark(px, pz, myR)) return true;
+    // 房子本体是**旋转矩形**，不能用圆形近似：房子朝向现在跟着院门走，圆形包不住四个角
+    for (const pd of layout.pads) {
+      const dx = px - pd.x;
+      const dz = pz - pd.z;
+      const c = Math.cos(pd.rot ?? 0);
+      const s = Math.sin(pd.rot ?? 0);
+      const lx = dx * c - dz * s;
+      const lz = dx * s + dz * c;
+      if (Math.abs(lx) < pd.w / 2 + myR * 0.5 + 0.35 && Math.abs(lz) < pd.d / 2 + myR * 0.5 + 0.35) return true;
+    }
     for (const o of occupied) {
       if ((px - o.x) ** 2 + (pz - o.z) ** 2 < (o.r + myR + 0.6) ** 2) return true;
     }
@@ -395,7 +453,6 @@ export function buildStructures(scene, layout, assets, palette) {
     }
   };
 
-  const P = cfg.props ?? {};
   place(assets.makeWell, P.well, { name: '水井', blockerRadius: 1.5, blockerHeight: 3.4, radius: 1.6 });
   place(assets.makeMillstone, P.millstone, { name: '石磨', blockerRadius: 1.2, radius: 1.6 });
   place(() => assets.makeHaystack(rand), P.haystacks, { name: '稻草堆', blockerRadius: 1.3, radius: 1.3 });
@@ -404,7 +461,8 @@ export function buildStructures(scene, layout, assets, palette) {
   place(assets.makeStoneBench, P.benches, { name: '石凳', blockerRadius: 1.0, radius: 1.1 });
   place(assets.makeLanternPost, P.lanternPosts, { name: '灯笼路灯', blockerRadius: 0.3, blockerHeight: 3.4, radius: 0.8 });
   place(assets.makeClothesline, P.clotheslines, { name: '晾衣绳', radius: 2.3, posts: [[-2.2, 0], [2.2, 0]], postRadius: 0.22 });
-  place(assets.makeMailbox, P.mailboxes, { name: '信箱', blockerRadius: 0.35, radius: 0.6 });
+  // 信箱已经在各院子里"挂"到院门旁了，这里只处理没分到院子的（超出院子数量的那些）
+  if (mailboxFree.length) place(assets.makeMailbox, mailboxFree, { name: '信箱', blockerRadius: 0.35, radius: 0.6 });
   place(assets.makeNetRack, P.netRacks, { name: '晒渔网架', blockerRadius: 1.6, blockerHeight: 2.6, radius: 2.1 });
   place(() => assets.makeDryingRack(rand), P.dryingRacks, { name: '晒鱼干架', blockerRadius: 1.1, radius: 1.6 });
   place(assets.makeWaterJar, P.waterJars, { name: '水缸', blockerRadius: 0.55, radius: 0.8 });

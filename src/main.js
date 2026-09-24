@@ -674,7 +674,19 @@ async function boot() {
       const r = renderer.domElement.getBoundingClientRect();
       return [((v.x + 1) / 2) * r.width, ((1 - v.y) / 2) * r.height, +v.z.toFixed(3)];
     },
-    wallGates: () => (structures.gates ?? []).map((g) => ({ x: +g.x.toFixed(1), z: +g.z.toFixed(1), r: g.r })),
+    wallGates: () => (structures.gates ?? []).map((g) => ({ x: +g.x.toFixed(1), z: +g.z.toFixed(1), r: g.r, owner: g.owner ?? null })),
+    // 石厝小院的朝向信息（门朝哪、院门在哪）——出图与核对用
+    padsInfo: () =>
+      layout.pads.map((p) => ({
+        id: p.id,
+        x: +p.x.toFixed(2),
+        z: +p.z.toFixed(2),
+        rot: +p.rot.toFixed(3),
+        w: p.w,
+        d: p.d,
+        top: +(p.y + (p.wallH ?? 3.4) + (p.roofH ?? 2.6) + 1.2).toFixed(2),
+        doorDir: [+Math.sin(p.rot).toFixed(3), +Math.cos(p.rot).toFixed(3)]
+      })),
     collisionInfo: () => ({
       circles: collision.circles.length,
       walls: collision.walls.length,

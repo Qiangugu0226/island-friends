@@ -51,12 +51,21 @@ function analyze(samples) {
   const speeds = []; // m/s：按各自的时间间隔归一化，避免"帧一长单步就大"的假警报
   let minClearance = Infinity;
   let insideSolid = 0;
+  let worstSolid = null; // 记录"最深入"的那次，方便报告里指名道姓
   for (let i = 0; i < samples.length; i++) {
     const s = samples[i];
     minClearance = Math.min(minClearance, s.pos[1] - s.ground);
-    // 只有相机高度低于建筑高度、且水平距离进入半径内，才算"穿进建筑"
-    const solid = s.near.filter((b) => b.d < b.r + 0.2 && (b.h === undefined || s.pos[1] < b.h));
-    if (solid.length) insideSolid++;
+    // "钻进建筑"只算**建筑级**的碰撞体（半径 ≥1m：房子/航标塔/土地庙），
+    // 而且要相机真的落在它水平范围**内部**（d < r*0.9）——擦过树桩/立柱不算钻进去。
+    // 相机高度还必须低于该建筑高度，否则是从屋顶上方飞过。
+    for (const b of s.near) {
+      if (b.r < 1.0) continue;
+      if (b.h !== undefined && s.pos[1] >= b.h) continue;
+      if (b.d >= b.r * 0.9) continue;
+      insideSolid++;
+      const depth = b.r - b.d;
+      if (!worstSolid || depth > worstSolid.depth) worstSolid = { depth: +depth.toFixed(2), r: +b.r.toFixed(2), d: +b.d.toFixed(2) };
+    }
     if (i === 0) continue;
     const d = Math.hypot(s.pos[0] - samples[i - 1].pos[0], s.pos[1] - samples[i - 1].pos[1], s.pos[2] - samples[i - 1].pos[2]);
     steps.push(d);
@@ -84,6 +93,7 @@ function analyze(samples) {
     speedSpike,
     minClearance,
     insideSolid,
+    worstSolid,
     radialReversals
   };
 }
@@ -152,6 +162,21 @@ check('③ 正常速度转视角：镜头没有忽远忽近（径向反向≤2�
 check('③ 转视角时相机没钻地', js.minClearance > 0.15, `最小离地 ${js.minClearance.toFixed(2)}m`);
 
 // ---------- 4. 站在房子边慢速绕一圈（最容易撞建筑的场景） ----------
+const pads = await ev(() => window.__island.padsInfo());
+// 相机是不是在某个房子的**旋转矩形**里（比"进到某个圆里"准得多：房子朝向＋四角都算得准）
+const houseAt = (pos) => {
+  for (const p of pads) {
+    if (pos[1] >= p.top) continue; // 从屋顶上方飞过不算
+    const c = Math.cos(p.rot);
+    const s = Math.sin(p.rot);
+    const dx = pos[0] - p.x;
+    const dz = pos[2] - p.z;
+    const lx = dx * c - dz * s;
+    const lz = dx * s + dz * c;
+    if (Math.abs(lx) < p.w / 2 + 0.05 && Math.abs(lz) < p.d / 2 + 0.05) return p.id;
+  }
+  return null;
+};
 await ev(() => window.__island.teleport(-33, 36));
 await delay(600);
 await ev(() => window.__island.setPitch(18));
@@ -162,8 +187,13 @@ for (let i = 0; i < 60; i++) {
   circle.push(await grab());
 }
 const jc = analyze(circle);
+const inHouse = circle.filter((s) => houseAt(s.pos)).map((s) => houseAt(s.pos));
 check('④ 绕房子一圈：相机没钻地', jc.minClearance > 0.15, `最小离地 ${jc.minClearance.toFixed(2)}m`);
-check('④ 绕房子一圈：相机没钻进建筑', jc.insideSolid === 0, `穿进 ${jc.insideSolid} 次`);
+check(
+  '④ 绕房子一圈：相机没钻进房子（按旋转矩形判定）',
+  inHouse.length === 0,
+  inHouse.length ? `有 ${inHouse.length} 帧在房子里：${[...new Set(inHouse)].join('/')}` : '0 帧'
+);
 
 // ---------- 5. 抬头看天 ----------
 await ev(() => window.__island.teleport(-6, -14));
