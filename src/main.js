@@ -155,7 +155,9 @@ async function boot() {
     ocean.foamHalo.mesh.visible = false;
   }
   if (hide.includes('ponds')) ocean.pondGroup.visible = false;
-  const sky = createSky(scene, cfg.dayPhases, palette);
+  // 光照整体倍率：world.json 的 dayPhases.lightScale 是默认值（见那里的说明），?light=2.6 可临时覆盖
+  const lightScale = parseFloat(params.get('light') ?? cfg.dayPhases.lightScale ?? '1');
+  const sky = createSky(scene, cfg.dayPhases, palette, Number.isFinite(lightScale) ? lightScale : 1);
   mark('ocean+sky');
 
   hud.setLoading('正在种树、灌木、石头与野花…', 0.5);

@@ -90,6 +90,8 @@
 
   "dayPhases": {
     "_说明": "昼夜配色关键帧（按小时）。HUD 里的时间会在这几个关键帧之间插值。",
+    "_lightScale说明": "整体光照倍率。three r155 之后是物理光照单位：关键帧里 0.95 这种「接近满亮」的老数值，实际打到地面只剩约三分之一亮度（漫反射要除以 π）。所以统一乘 2.6 把它抬回设计意图的亮度。URL 加 ?light=2.6 可临时覆盖做对比。",
+    "lightScale": 2.6,
     "keyframes": [
       { "hour": 0,  "skyTop": "#22305A", "skyHorizon": "#3E4E7E", "sun": "#9DB4E0", "sunIntensity": 0.26, "ambient": "#3A4874", "ambientIntensity": 0.52, "fog": "#2B3760", "phase": "夜晚" },
       { "hour": 5,  "skyTop": "#3B4A76", "skyHorizon": "#8A7C93", "sun": "#C6A38C", "sunIntensity": 0.30, "ambient": "#4A5473", "ambientIntensity": 0.48, "fog": "#6B6B85", "phase": "黎明" },
@@ -137,10 +139,10 @@
   },
 
   "buildings": [
-    { "id": "house-stone", "style": "stone", "x": -31, "z": 27, "rot": 0.42,  "w": 9.0, "d": 7.4, "wallH": 3.4, "roofH": 2.6, "roofTile": "#8B9095", "ridge": "#B4553F" },
-    { "id": "house-white", "style": "white", "x": 21,  "z": 21, "rot": -0.28, "w": 8.4, "d": 7.0, "wallH": 3.2, "roofH": 2.5, "roofTile": "#6E7378", "ridge": "#B4553F" },
-    { "id": "house-brick", "style": "brick", "x": 33,  "z": -15, "rot": 0.95, "w": 8.8, "d": 7.2, "wallH": 3.3, "roofH": 2.6, "roofTile": "#8B9095", "ridge": "#D9453A" },
-    { "id": "house-stone2", "style": "stone", "x": -12, "z": -24, "rot": -0.65, "w": 9.2, "d": 7.6, "wallH": 3.5, "roofH": 2.7, "roofTile": "#9AA0A4", "ridge": "#B4553F" }
+    { "id": "house-stone", "style": "stone", "x": -31, "z": 27, "rot": 0.42,  "w": 9.0, "d": 7.4, "wallH": 3.4, "roofH": 2.6, "roofTile": "#D9534F", "ridge": "#B4553F" },
+    { "id": "house-white", "style": "white", "x": 21,  "z": 21, "rot": -0.28, "w": 8.4, "d": 7.0, "wallH": 3.2, "roofH": 2.5, "roofTile": "#E8B44A", "ridge": "#B4553F" },
+    { "id": "house-brick", "style": "brick", "x": 33,  "z": -15, "rot": 0.95, "w": 8.8, "d": 7.2, "wallH": 3.3, "roofH": 2.6, "roofTile": "#4FA3A5", "ridge": "#D9453A" },
+    { "id": "house-stone2", "style": "stone", "x": -12, "z": -24, "rot": -0.65, "w": 9.2, "d": 7.6, "wallH": 3.5, "roofH": 2.7, "roofTile": "#7FAE4E", "ridge": "#B4553F" }
   ],
 
   "beaconTower": { "_说明": "航标塔（原灯塔位置），岛上地标", "x": 0, "z": -47, "height": 14.5, "rot": 0.0 },
@@ -206,7 +208,7 @@
     "saturation": 1.16,
     "warmHighlights": 1.1,
     "coolShadows": 1.0,
-    "vignette": 0.26,
+    "vignette": 0.1,
     "liftShadows": 0.018,
     "fxaa": true,
     "samples": 0

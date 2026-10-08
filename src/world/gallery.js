@@ -13,9 +13,9 @@ export function createGallery(scene, cfg, assets, palette, extraItems = []) {
   const dz = 24;
 
   const items = [
-    { label: '石厝 · 灰瓦', make: () => assets.makeStoneHouse(rand, { style: 'stone', w: 9.0, d: 7.4, wallH: 3.4, roofH: 2.6, roofTile: '#8B9095', ridge: '#B4553F', rot: 0 }) },
-    { label: '石厝 · 白墙', make: () => assets.makeStoneHouse(rand, { style: 'white', w: 8.4, d: 7.0, wallH: 3.2, roofH: 2.5, roofTile: '#6E7378', ridge: '#B4553F', rot: 0 }) },
-    { label: '红砖厝', make: () => assets.makeStoneHouse(rand, { style: 'brick', w: 8.8, d: 7.2, wallH: 3.3, roofH: 2.6, roofTile: '#8B9095', ridge: '#D9453A', rot: 0 }) },
+    { label: '石厝 · 红瓦', make: () => assets.makeStoneHouse(rand, { style: 'stone', w: 9.0, d: 7.4, wallH: 3.4, roofH: 2.6, roofTile: '#D9534F', ridge: '#B4553F', rot: 0 }) },
+    { label: '石厝 · 黄瓦（白墙）', make: () => assets.makeStoneHouse(rand, { style: 'white', w: 8.4, d: 7.0, wallH: 3.2, roofH: 2.5, roofTile: '#E8B44A', ridge: '#B4553F', rot: 0 }) },
+    { label: '红砖厝 · 青瓦', make: () => assets.makeStoneHouse(rand, { style: 'brick', w: 8.8, d: 7.2, wallH: 3.3, roofH: 2.6, roofTile: '#4FA3A5', ridge: '#D9453A', rot: 0 }) },
     { label: '石砌院墙', make: () => assets.makeStoneWallYard(13, 11, { gaps: [{ x: 0, z: 5.5, r: 2.6 }] }) },
     { label: '航标塔（地标）', make: () => assets.makeBeaconTower({ height: 14.5 }).group },
     { label: '土地庙', make: () => assets.makeShrine().group },

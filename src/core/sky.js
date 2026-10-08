@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { clamp, lerp } from './rng.js';
 
 // 昼夜天空 + 光照。天空是一个跟在相机上的渐变穹顶（还原参考图的奶油天空）
-export function createSky(scene, dayPhases, palette) {
+// lightScale：整体光照倍率。three r155 之后是物理光照单位，关键帧里 0.95 这种"接近满亮"的
+// 老数值实际只有约三分之一亮度，所以需要一个可以整体抬升/压低灯的旋钮。
+// 正常玩时由 world.json 的 dayPhases 决定；URL ?light=2.6 可以实时预览不同倍率。
+export function createSky(scene, dayPhases, palette, lightScale = 1) {
   const uniforms = {
     uTop: { value: new THREE.Color(palette.skyTop) },
     uHorizon: { value: new THREE.Color(palette.skyHorizon) },
@@ -111,13 +114,13 @@ export function createSky(scene, dayPhases, palette) {
     uniforms.uSunStrength.value = clamp(cfg.sunIntensity, 0.1, 1.4);
 
     sun.color.copy(cfg.sun);
-    sun.intensity = cfg.sunIntensity;
+    sun.intensity = cfg.sunIntensity * lightScale;
     const focusPos = focus || new THREE.Vector3();
     sun.target.position.copy(focusPos);
     sun.position.copy(focusPos).addScaledVector(sunDir, 120);
 
     hemi.color.copy(cfg.ambient);
-    hemi.intensity = cfg.ambientIntensity;
+    hemi.intensity = cfg.ambientIntensity * lightScale;
 
     fog.color.copy(cfg.fog);
     fog.near = 240;
