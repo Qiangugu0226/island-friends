@@ -98,6 +98,56 @@ function analyze(samples) {
   };
 }
 
+// 页面内逐帧记录器：轮询（每 80ms 问一次）在 headless 里会撞上低帧率（实测约 5fps），
+// 把"一帧里镜头释放了 1.67m"除以 80ms 的轮询间隔，就会算出 21m/s 的假峰值。
+// 而且主循环把 dt 夹在 0.06s（见 src/main.js），低帧率下每帧的位移本来就更大。
+// 所以判定"摆不摆"一律用**页面内逐帧**数据（真实帧 dt），不用轮询数据。
+const startFrameRec = () =>
+  ev(() => {
+    window.__camRec = [];
+    window.__camRecOn = true;
+    let last = performance.now();
+    const loop = () => {
+      if (!window.__camRecOn) return;
+      const now = performance.now();
+      const c = window.__island.cameraInfo();
+      window.__camRec.push({ t: now, fdt: (now - last) / 1000, pos: c.pos, dist: c.dist });
+      last = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  });
+const stopFrameRec = () => ev(() => { window.__camRecOn = false; return window.__camRec; });
+
+// 逐帧分析：速度用**该帧自己的 dt**，和帧率无关
+function analyzeFrames(rec) {
+  const steps = [];
+  const speeds = [];
+  for (let i = 1; i < rec.length; i++) {
+    const a = rec[i - 1];
+    const b = rec[i];
+    const d = Math.hypot(b.pos[0] - a.pos[0], b.pos[1] - a.pos[1], b.pos[2] - a.pos[2]);
+    steps.push(d);
+    speeds.push(d / Math.max(b.fdt, 1e-3));
+  }
+  let radialReversals = 0;
+  let lastSign = 0;
+  for (let i = 1; i < rec.length; i++) {
+    const sign = Math.sign(rec[i].dist - rec[i - 1].dist);
+    if (sign !== 0 && lastSign !== 0 && sign !== lastSign) radialReversals++;
+    if (sign !== 0) lastSign = sign;
+  }
+  const sorted = [...speeds].sort((a, b) => a - b);
+  return {
+    frames: rec.length,
+    fps: rec.length > 1 ? (rec.length - 1) / ((rec[rec.length - 1].t - rec[0].t) / 1000) : 0,
+    maxStep: steps.length ? Math.max(...steps) : 0,
+    medSpeed: sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0,
+    maxSpeed: speeds.length ? Math.max(...speeds) : 0,
+    radialReversals
+  };
+}
+
 console.log(`目标：${target.kind === 'file' ? '单文件离线版' : target.url}\n`);
 
 // ---------- 1. 静止：完全不动，看有没有自发抖动 ----------
@@ -122,6 +172,7 @@ await ev(() => window.__island.setPitch(38));
 await ev(() => window.__island.setYaw(15));
 await delay(500);
 const p0 = await ev(() => window.__island.pos());
+await startFrameRec();
 await page.keyboard.down('KeyW');
 const walkSamples = [];
 for (let i = 0; i < 36; i++) {
@@ -129,16 +180,22 @@ for (let i = 0; i < 36; i++) {
   walkSamples.push(await grab());
 }
 await page.keyboard.up('KeyW');
+const walkFrames = await stopFrameRec();
 const p1 = await ev(() => window.__island.pos());
 const jw = analyze(walkSamples);
+const jf = analyzeFrames(walkFrames);
 console.log(`   ② 贴着石厝走过：走了 ${Math.hypot(p1[0] - p0[0], p1[2] - p0[2]).toFixed(1)}m`);
 // 判据说明：相机避让建筑是"收快放慢"的设计 —— 墙/房子进入视线射线时会**立即**拉近，
-// 所以"速度峰值"本来就会高于玩家的走路速度，不能拿它当抖动。真正的抖动是**来回摆**，
-// 用"镜头到焦点的距离反复反向"来判定（和帧时长无关，也不受 headless 掉帧影响）。
+// 放远则按 3/s 的指数速率慢慢来。所以"镜头到焦点的距离"在恢复过程中本来就以
+// k×距离误差 的速度移动（k=3/s，最大误差≈9.5-1.3=8.2m → 理论上限约 24.6m/s），
+// 拿一个固定的"速度上限"去卡它必然误报。
+// 真正的抖动是**来回摆**：用"镜头到焦点的距离反复反向"判定（与帧率无关），
+// 再加一条"逐帧位移不能突然跳变"的兜底（逐帧数据，真实帧 dt）。
 check(
   '② 走路经过建筑：镜头没有来回摆',
-  jw.radialReversals <= 2 && jw.maxSpeed < 14,
-  `径向反向 ${jw.radialReversals} 次 · 速度中位 ${jw.medSpeed.toFixed(2)}m/s 峰值 ${jw.maxSpeed.toFixed(2)}m/s（单步最大 ${jw.maxStep.toFixed(2)}m）`
+  jf.radialReversals <= 2 && jf.maxStep < 4.0,
+  `逐帧(${jf.fps.toFixed(0)}fps)：径向反向 ${jf.radialReversals} 次 · 速度中位 ${jf.medSpeed.toFixed(2)}m/s 峰值 ${jf.maxSpeed.toFixed(2)}m/s · 单帧位移最大 ${jf.maxStep.toFixed(2)}m` +
+    ` ｜ 轮询口径（仅参考）：径向反向 ${jw.radialReversals} 次 · 峰值 ${jw.maxSpeed.toFixed(2)}m/s`
 );
 check('② 走路经过建筑：相机没钻地', jw.minClearance > 0.15, `最小离地 ${jw.minClearance.toFixed(2)}m`);
 check('② 走路经过建筑：相机没钻进建筑', jw.insideSolid === 0, `穿进 ${jw.insideSolid} 次`);
@@ -215,5 +272,5 @@ await browser.close();
 const pass = results.filter(Boolean).length;
 console.log(`\n通过 ${pass}/${results.length}`);
 if (errs.length) console.log('页面错误：', errs.slice(0, 4).join(' | '));
-writeFileSync('shots/camera-report.json', JSON.stringify({ idle: ji, walk: jw, spin: js, circle: jc, look }, null, 2));
+writeFileSync('shots/camera-report.json', JSON.stringify({ idle: ji, walk: jw, walkFrames: jf, spin: js, circle: jc, look }, null, 2));
 process.exit(pass === results.length ? 0 : 1);

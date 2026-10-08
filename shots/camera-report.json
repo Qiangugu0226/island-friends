@@ -12,59 +12,63 @@
     "radialReversals": 0
   },
   "walk": {
-    "maxStep": 1.146036648628659,
-    "avg": 0.2347686516624254,
-    "spike": 0.9112679969662336,
-    "medSpeed": 2.6138210324374054,
-    "maxSpeed": 12.94956665117129,
-    "speedSpike": 10.335745618733885,
-    "minClearance": 3.8199999999999994,
+    "maxStep": 0.8521150157109056,
+    "avg": 0.18759729292319682,
+    "spike": 0.6645177227877088,
+    "medSpeed": 2.609144902278115,
+    "maxSpeed": 7.718433113948494,
+    "speedSpike": 5.109288211670379,
+    "minClearance": 4.890000000000001,
     "insideSolid": 0,
     "worstSolid": null,
     "radialReversals": 0
   },
+  "walkFrames": {
+    "frames": 21,
+    "fps": 6.1042607740369235,
+    "maxStep": 0.8521150157109056,
+    "medSpeed": 1.6721737478550853,
+    "maxSpeed": 5.613405900709058,
+    "radialReversals": 0
+  },
   "spin": {
-    "maxStep": 8.702505386381555,
-    "avg": 0.8336136650561463,
-    "spike": 7.868891721325408,
-    "medSpeed": 6.750701223579126,
-    "maxSpeed": 92.0900040886937,
-    "speedSpike": 85.33930286511458,
-    "minClearance": 1.87,
+    "maxStep": 8.115041589542223,
+    "avg": 0.9244246122144373,
+    "spike": 7.190616977327785,
+    "medSpeed": 0,
+    "maxSpeed": 86.14693831513253,
+    "speedSpike": 86.14693831513253,
+    "minClearance": 2.2600000000000007,
     "insideSolid": 0,
     "worstSolid": null,
     "radialReversals": 2
   },
   "circle": {
-    "maxStep": 4.266532549975443,
-    "avg": 0.7511272178308862,
-    "spike": 3.5154053321445566,
-    "medSpeed": 7.600595028758903,
-    "maxSpeed": 48.984300228501155,
-    "speedSpike": 41.38370519974225,
-    "minClearance": 1.6399999999999997,
-    "insideSolid": 3,
-    "worstSolid": {
-      "depth": 0.12,
-      "r": 1.1,
-      "d": 0.98
-    },
-    "radialReversals": 6
+    "maxStep": 8.80165325379272,
+    "avg": 0.7765692452214699,
+    "spike": 8.02508400857125,
+    "medSpeed": 0,
+    "maxSpeed": 91.9712983648759,
+    "speedSpike": 91.9712983648759,
+    "minClearance": 1.4400000000000004,
+    "insideSolid": 0,
+    "worstSolid": null,
+    "radialReversals": 7
   },
   "look": [
     {
       "pitch": 30,
-      "clear": 4.58,
-      "dist": 7.22
+      "clear": 4.84,
+      "dist": 7.71
     },
     {
       "pitch": 12,
-      "clear": 2.11,
-      "dist": 5.44
+      "clear": 2.23,
+      "dist": 6.03
     },
     {
       "pitch": 0,
-      "clear": 0.97,
+      "clear": 0.98,
       "dist": 5.44
     },
     {
@@ -74,13 +78,13 @@
     },
     {
       "pitch": -22,
-      "clear": 0.68,
-      "dist": 3.9
+      "clear": 0.66,
+      "dist": 3.84
     },
     {
       "pitch": -30,
-      "clear": 0.66,
-      "dist": 3.96
+      "clear": 0.69,
+      "dist": 3.84
     }
   ]
 }
