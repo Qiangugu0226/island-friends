@@ -21,3 +21,6 @@ vite-run.log
 Thumbs.db
 
 # 留档：docs/（阶段文档）、shots/（每阶段截图）、concepts/（画风概念图）都要进仓库
+
+# DSH 视觉路由调试输出（本地工具产物，不入库）
+.dsh-vision-router/
